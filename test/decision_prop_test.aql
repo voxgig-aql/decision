@@ -1,0 +1,130 @@
+# Property-based tests for the decision module — DIRECT-CODE FORM.
+#
+# This file exercises aql:test's imperative `Test.check-prop` driver,
+# called directly in code with explicit run / seed / shrink counts —
+#
+#   Test.check-prop NAME  [GEN-BODY]  [PROP-BODY]  RUNS  SEED  MAX-SHRINKS
+#
+# GEN-BODY: code that runs with `r` bound to the random source; must
+#           leave exactly one value on the stack (the generated input).
+# PROP-BODY: code that runs with the generated input on the stack
+#           (also reachable as `args.0`); must return a Boolean.
+#
+# Every invariant below keeps the compared fields PRESENT in the input
+# map: an ordering op (lt/lte/gt/gte) on a MISSING field is None, not
+# Comparable, and would RAISE not_comparable rather than return false.
+# So generated inputs always carry the field a condition reads.
+#
+# Run:
+#   aql test/decision_prop_test.aql
+
+
+import "aql:test" end
+import "./decision.aql" end
+
+
+# --- P1. eval-cond eq reflexivity ----------------------------------
+#
+# For any value v, the condition `field v == v` holds: an `eq` test of
+# a field against its own value is always true. eq is total (works for
+# any value), and the field is present, so this never raises.
+
+Test.check-prop "eval-cond-eq-reflexive"
+  [r.int 0 1000]                                      # gen: v in [0, 1000]
+  [
+    var [[v]
+      def cond {field:"v" op:"eq" value:v}
+      def input {v:v}
+      (Decision.eval-cond cond input)
+    ]
+  ]
+  50 1 0
+end
+
+
+# --- P2. apply-op eq / neq are complementary -----------------------
+#
+# For any pair (a, b), exactly one of `a eq b` / `a neq b` holds:
+# apply-op with "neq" is the boolean negation of apply-op with "eq".
+# (apply-op rhs op lhs computes `lhs op rhs`.)
+
+Test.check-prop "apply-op-eq-neq-complement"
+  [do {a: [r.int 0 5], b: [r.int 0 5]}]               # gen: small a,b so collisions occur
+  [
+    var [[pair]
+      def a (pair "a" get)
+      def b (pair "b" get)
+      def is-eq  (Decision.apply-op b "eq"  a)
+      def is-neq (Decision.apply-op b "neq" a)
+      is-eq eq (is-neq not)
+    ]
+  ]
+  50 1 0
+end
+
+
+# --- P3. table "first" returns the FIRST matching then -------------
+#
+# Build a two-rule table where BOTH rules match (each is `gte` against
+# a present field whose value clears both thresholds). Under the
+# default "first" hit policy, eval-table returns the first rule's then,
+# never the second's. The generated value is >= both thresholds.
+
+Test.check-prop "table-first-wins"
+  [r.int 100 200]                                     # gen: n well above both rules
+  [
+    var [[n]
+      def table (Decision.make-table [
+        (Decision.make-rule {field:"n" op:"gte" value:0}  {pick:"first"})
+        (Decision.make-rule {field:"n" op:"gte" value:50} {pick:"second"})
+      ])
+      def out (Decision.eval-table table {n:n})
+      (out "pick" get) eq "first"
+    ]
+  ]
+  50 1 0
+end
+
+
+# --- P4. tree single-leaf identity ---------------------------------
+#
+# A tree whose root IS a leaf returns that leaf's result for ANY input —
+# there are no branches to walk, so the input is irrelevant. The leaf
+# result is the generated value; eval-tree must return it unchanged.
+
+Test.check-prop "tree-single-leaf-identity"
+  [r.int 0 1000]                                      # gen: the leaf payload
+  [
+    var [[payload]
+      def tree (Decision.make-tree only/q [
+        (Decision.make-leaf only/q payload)
+      ])
+      def out (Decision.eval-tree tree {anything:1})
+      out eq payload
+    ]
+  ]
+  50 1 0
+end
+
+
+# --- summary -------------------------------------------------------
+
+"---" print
+"results:" print
+def all-results (Test.results end)
+def _print-results (all-results each [
+  var [[r]
+    def nm (r "name" get)
+    def ok (r "ok" get)
+    if ok [
+      `  pass: ${nm}` print
+    ] [
+      `  FAIL: ${nm}  failing-input=${r "failing-input" get}` print
+    ]
+    0
+  ]
+])
+"---" print
+"fail count: " print (Test.fail-count end) print
+0 (Test.fail-count end) Assert.equal end
+"all green" print
