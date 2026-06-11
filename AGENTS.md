@@ -1,143 +1,186 @@
-# AGENTS.md — using the `Bloom` library
+# AGENTS.md — using the `Decision` library
 
-Guidance for an AI coding agent calling this bloom-filter library from an
+Guidance for an AI coding agent calling this decision-logic library from an
 AQL project. Every code block below is verified to run against
-`aql-lang/aql` @ `db828ec`. If you read nothing else, read
+`aql-lang/aql` @ `958c379b`. If you read nothing else, read
 [The one calling rule](#the-one-calling-rule) and
 [Common mistakes](#common-mistakes).
 
 ## What it is
 
-A probabilistic set: "have I seen this item?" in little memory, with **no
-false negatives** and a tunable false-positive rate. The public surface
-is the `Bloom` namespace, plus the `BloomFilter` and `Bits` types.
+Declarative **decision logic**: express business rules as data — a
+**condition**, a compound **predicate**, a **decision table** (rules with a
+hit policy), or a **decision tree** (branch/leaf nodes) — then evaluate them
+against an input `Map`. The public surface is the `Decision` namespace.
+
+This library needs **aql ≥ `958c379b`** — it uses `surface`/`exposes`,
+generics, `refine Record`, and `fnsig`. It imports no `aql:*` dependencies.
 
 ## Import
 
 ```aql
-import "./bloom.aql" end
+import "./decision.aql"
 ```
 
-- The path is resolved **relative to the working directory the script is
-  run from**, not relative to the importing file. Run scripts from the
-  directory where that relative path is valid (adjust the path otherwise).
-- Do **not** import `aql:math-util` or `aql:array-util` yourself — `bloom.aql`
-  imports its own dependencies.
+- The path resolves **relative to the working directory the script is run
+  from**, not the importing file. Run scripts from the directory where that
+  relative path is valid.
 
 ## The one calling rule
 
-AQL is not C/Python/JS. There is no `f(a, b)` and no `obj.method(a)`.
-A call is written:
+AQL is not C/Python/JS. There is no `f(a, b)` and no `obj.method(a)`. The
+canonical form is **forward** — the verb first, then its arguments:
 
 ```
-receiver Bloom.verb arg1 arg2 end
+Decision.verb arg1 arg2
 ```
 
-— the **receiver/data comes first**, then the verb, then any extra
-arguments, and the call is **terminated with `end`** (or wrapped in
-parens). Without a terminator the verb swallows whatever token follows it
-and you get wrong results or a dispatch error.
+Two ordering facts that matter here:
 
-```aql
-def bf ({n: 1000, p: 0.01} Bloom.make end)
-def _ (bf Bloom.add "alice" end)
-(bf Bloom.contains "alice" end) print    # => true
-```
-
-`(… )` parentheses count as a terminator, so `(bf Bloom.contains "x")` is
-fine too; use `end` for top-level statements that aren't already wrapped.
+- **Evaluators take the model first, the input second:**
+  `Decision.eval-table table input`, `Decision.decide model input`,
+  `Decision.eval-cond cond input`. (Equivalently, in stack form the model
+  sits on *top* of the input: `input table Decision.eval-table`.)
+- **Wrap a call in parens, or end it,** when a bare value would otherwise
+  follow the verb and get swallowed: `(Decision.decide table {age:25})`.
 
 ## API reference (exact call shapes)
 
+Records are plain `refine Record` values — build them with a builder **or**
+write them as Map literals; the evaluators only read fields.
+
+**Builders**
+
 | Call | Returns | Notes |
 |------|---------|-------|
-| `{n: Integer, p: Float} Bloom.make end` | `BloomFilter` | `n` = expected distinct items; `p` = target false-positive rate in `(0, 0.5]`. Derives `m`, `k`. |
-| `bf Bloom.add item end` | the **same** `bf` (mutated) | Any value; stringified internally. Sets `k` bits, increments `added`. |
-| `bf Bloom.contains item end` | `Boolean` | `false` = **definitely never added**. `true` = *probably* added (may be a false positive). |
-| `bf Bloom.count end` | `Integer` | **Estimate** of distinct items, not an exact tally. Empty filter ⇒ `0`. `O(m)`. |
-| `bf Bloom.params end` | `Map` | `{n, p, m, k}`. |
-| `a Bloom.merge b end` | the **same** `a` (mutated) | Union of `a` and `b` into `a`. Requires identical `m` and `k`. `O(m)`. |
-| `bf Bloom.encode end` | `String` | jsonic snapshot: params + set-bit indices. One-way (no `decode`). |
+| `Decision.cond field op value` | `Cond` | `field` is an Atom (`age/q`); `op` a String; see ops below. |
+| `Decision.all-of children` | `Pred` | every child condition/predicate must hold. |
+| `Decision.any-of children` | `Pred` | at least one child must hold. |
+| `Decision.not-of child` | `Pred` | negate one condition. |
+| `Decision.make-rule when then` | `Rule` | pair a `when` (cond/pred Map) with a `then` result. |
+| `Decision.make-table rules` | `DTable` | a list of rules; hit policy defaults to `"first"`. |
+| `Decision.with-policy policy table` | `DTable` | copy `table` with a new hit policy. |
+| `Decision.make-branch id branches` | `BranchNode` | `id` Atom; `branches` = `[{when:… next:…} …]`. |
+| `Decision.make-leaf id result` | `LeafNode` | `id` Atom; `result` any value. |
+| `Decision.make-tree root nodes` | `DTree` | `root` = the start node id (Atom); `nodes` = node list. |
 
-Construct filters **only** through `Bloom.make`. Treat `BloomFilter`
-fields as read-only; mutate through the namespace words.
+**Evaluators** (each applied against an input `Map`)
+
+| Call | Returns | Notes |
+|------|---------|-------|
+| `Decision.apply-op rhs op lhs` | `Boolean` | the primitive compare: `lhs op rhs`. Ordering ops need Comparable operands. |
+| `Decision.eval-cond cond input` | `Boolean` | reads `input.(cond.field)` and applies `cond.op` against `cond.value`. |
+| `Decision.eval-pred pred input` | `Boolean` | evaluates an all/any/not group (or a bare condition). |
+| `Decision.eval-table table input` | result `Map` / value, or `{ok:false error:…}` | runs the table under its hit policy. |
+| `Decision.eval-tree tree input` | leaf result, or `{ok:false error:…}` | walks branches to a leaf. |
+| `Decision.decide model input` | as above | dispatches on `model.kind` (`"table"` or `"tree"`). |
+
+**Operators** (the `op` String)
+
+- Binary, Comparable: `eq`, `neq`, `lt`, `lte`, `gt`, `gte` — used in conditions
+  (`{field op value}`) and via `Decision.apply-op rhs op lhs`.
+- Unary: `is_true`, `is_false`, `is_null`, `is_not_null` — reachable **only**
+  through the direct two-arg call `Decision.apply-op rhs op`. They are **not**
+  usable inside a condition/table/tree, because `eval-cond` always supplies a
+  `value`, so a unary op there falls through to the binary form and raises.
+
+**Hit policies** (for tables)
+
+- `"first"` *(default)* — the first matching rule's `then`.
+- `"unique"` — the single match; `{ok:false error:"multiple-matches"}` if more
+  than one rule matches, `"no-match"` if none.
+- `"collect"` — a **List** of every matching rule's `then`.
+- `"priority"` — the matching rule with the highest `priority` field (default
+  `0`).
+
+**Error results** — evaluators never throw on a miss; they return a Map:
+`{ok:false error:"no-match"}`, `"multiple-matches"`, `"unknown-model-kind"`,
+`"no-branch-match"`, `"node-not-found"`, `"unknown-node-kind"`,
+`"max-depth-exceeded"`.
 
 ## Copy-paste idioms (all verified)
 
-Create, add, query:
+A decision **table** (first-match routing):
 
 ```aql
-import "./bloom.aql" end
-def seen ({n: 10000, p: 0.01} Bloom.make end)
-def _ (seen Bloom.add "ada" end)
-(seen Bloom.contains "ada"   end) print   # => true
-(seen Bloom.contains "linus" end) print   # => false
+import "./decision.aql"
+def rules [
+  (Decision.make-rule {field:"age" op:"lt"  value:18} {category:"minor"})
+  (Decision.make-rule {field:"age" op:"gte" value:65} {category:"senior"})
+]
+def table (Decision.make-table rules)
+(Decision.decide table {age:12}) print   # => {category: minor}
+(Decision.decide table {age:70}) print   # => {category: senior}
+(Decision.decide table {age:30}) print   # => {ok:false error:no-match}
 ```
 
-Add many in a loop (`each` body must yield a value — push a `0`):
+A compound condition inside a rule (`all-of` / `any-of` / `not-of`):
 
 ```aql
-def bf ({n: 1000, p: 0.01} Bloom.make end)
-def _ (iota 50 each [
-  var [[i] bf Bloom.add (convert String i) end 0 ]
-])
-(bf Bloom.count end) print                # => ~50 (an estimate)
+def rule (Decision.make-rule
+  {kind:"group" op:"all" children:[
+    {field:"age"   op:"gte" value:18}
+    {field:"score" op:"gte" value:90}
+  ]}
+  {tier:"premium"})
+def tbl (Decision.make-table [rule])
+(Decision.decide tbl {age:25 score:95}) print   # => {tier: premium}
+(Decision.decide tbl {age:25 score:50}) print   # => {ok:false error:no-match}
 ```
 
-Merge two filters built with the **same `(n, p)`**:
+Collect every matching rule instead of just the first:
 
 ```aql
-def a ({n: 1000, p: 0.01} Bloom.make end)
-def b ({n: 1000, p: 0.01} Bloom.make end)
-def _a (a Bloom.add "from-a" end)
-def _b (b Bloom.add "from-b" end)
-def merged (a Bloom.merge b end)
-(merged Bloom.contains "from-a" end) print   # => true
-(merged Bloom.contains "from-b" end) print   # => true
+def tags (Decision.with-policy "collect" (Decision.make-table [
+  (Decision.make-rule {field:"age"   op:"gte" value:18} {tag:"adult"})
+  (Decision.make-rule {field:"score" op:"gte" value:50} {tag:"passing"})
+]))
+(Decision.decide tags {age:25 score:80}) print   # => [{tag: adult}, {tag: passing}]
 ```
 
-Guard an incompatible merge (mismatched `(n, p)` raises):
+A decision **tree** (branch → leaf):
 
 ```aql
-def a ({n: 1000, p: 0.01} Bloom.make end)
-def b ({n:  500, p: 0.01} Bloom.make end)    # different n ⇒ different m
-def result (do [a Bloom.merge b end] error [
-  var [[e] "incompatible filters — rebuild b with a's (n, p)" ]
-])
-result print
+def tree {kind:"tree" root:"root" nodes:[
+  {id:"root" kind:"branch" branches:[
+    {when:{field:"age" op:"lt"  value:18} next:"minor"}
+    {when:{field:"age" op:"gte" value:18} next:"adult"}
+  ]}
+  {id:"minor" kind:"leaf" result:"too-young"}
+  {id:"adult" kind:"leaf" result:"welcome"}
+]}
+(Decision.decide tree {age:40}) print   # => welcome
 ```
 
-In a test, assert the failure instead:
+Test one condition or one operator directly:
 
 ```aql
-import "aql:test" end
-[a Bloom.merge b end] Assert.throws end
+(Decision.eval-cond {field:"age" op:"gte" value:18} {age:25}) print   # => true
+(Decision.apply-op 18 "gte" 25) print                                  # => true  (lhs 25 gte rhs 18)
 ```
 
 ## Common mistakes
 
 | ✗ Don't write | ✓ Write | Why |
 |---------------|---------|-----|
-| `Bloom.contains(bf, "x")` | `bf Bloom.contains "x" end` | No `f(a,b)` syntax in AQL. |
-| `bf.contains("x")` | `bf Bloom.contains "x" end` | No method-call syntax. |
-| `bf Bloom.add "x"` (no terminator, mid-expression) | `bf Bloom.add "x" end` | The verb swallows the next token without `end`/parens. |
-| `def bf2 (bf Bloom.add "x" end)` then use `bf` as "before" | `add` mutates in place | `bf` and the returned value are the **same** object; there is no immutable copy. |
-| treat `contains ⇒ true` as certain | verify against source of truth | `true` is probabilistic (≈ rate `p`); only `false` is certain. |
-| `a Bloom.merge b end` with different `(n, p)` | build both with identical `(n, p)` | Mismatched `m`/`k` raises `undefined_word: bloom-merge-requires-equal-m` (or `…-k`). |
-| `make BloomFilter {…}` | `{n, p} Bloom.make end` | Construct only via `Bloom.make`. |
-| `(bf Bloom.count end)` for an exact count | read `added` via `Bloom.encode`/`bf.added` | `count` is an estimate; `added` is the exact insert count. |
-| `import "aql:math-util"` in your script | nothing | `bloom.aql` imports its own deps. |
+| `Decision.decide {age:25} table` | `Decision.decide table {age:25}` | The **model comes first**, the input second. |
+| `decide table input` (unqualified) | `Decision.decide table input` | Words live under the `Decision` namespace after import. |
+| `Decision.eval-table rules input` | `Decision.eval-table table input` | Pass the **table** (`make-table rules`), not the raw rules list. |
+| `op: ">="` / `op: "ge"` | `op: "gte"` | Ops are `eq/neq/lt/lte/gt/gte` + the unary `is_*` set. |
+| compare a Map/List with `lt` | compare scalars (or `eq`/`neq` only) | Ordering ops need **Comparable** operands; otherwise `apply-op` raises `not_comparable`. |
+| treat a miss as an exception | inspect `result.error` (a hit has none) | A *non-match* returns `{ok:false error:"…"}` (no throw); a hit is your bare `then`/leaf value, with no `ok`/`error` fields. |
+| an ordering op (`lt`/`gte`/…) on a maybe-missing field | guarantee the field is present, or compare it only with `eq`/`neq` | A missing field is `None`, not Comparable, so an ordering op **raises** `not_comparable`. (`eq`/`neq` return false for a missing field; the unary `is_*` ops can't gate this — they aren't usable in conditions.) |
+| `make-branch "root" …` | `make-branch root/q …` | The builder's `id` is an **Atom**; quote bare names with `/q`. |
 
-A note on `print` while debugging: `print` collects a forward argument,
-so `(a) print (b) print` reverses and a bare trailing `print` may fail to
-find its value. Write `print (value) end` (or `(value) print end`), one
-value per statement.
+A note on `print` while debugging: `print` collects a forward argument, so a
+chain like `(a) print (b) print` can reorder. Write `print (value) end` (or
+`(value) print end`), one value per statement.
 
 ## Where to look next
 
-- `docs/reference.md` — full signatures, stack-in columns, complexity.
-- `api.json` — the same API as a machine-readable manifest (exact call
-  shapes, argument order, return types).
-- `docs/how-to.md` — task recipes (sizing, merge, persist, test).
-- `test/bloom_smoke_test.aql` — a complete, runnable worked example.
-- `dx-report.md` — known AQL-runtime gotchas observed with this build.
+- `docs/reference.md` — full signatures, the record shapes, and complexity.
+- `api.json` — the same API as a machine-readable manifest (call shapes, arg
+  order, return types).
+- `docs/how-to.md` — task recipes (tables, trees, hit policies, testing).
+- `test/decision_smoke_test.aql` — a complete, runnable worked example.
+- `dx-report.md` — AQL-runtime notes observed building this library.

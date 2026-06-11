@@ -1,9 +1,10 @@
-# Tutorial: your first bloom filter
+# Tutorial: your first decision table
 
 This is a hands-on lesson. By the end you will have built a small AQL
-script that tracks which usernames it has seen, queried it, and watched
-a false positive appear. You need no prior knowledge of bloom filters —
-just a working `aql` binary (see
+script that classifies people by age with a **decision table**, grown it
+into a compound rule, collected every match, and finally walked a
+**decision tree**. You need no prior knowledge of decision logic — just a
+working `aql` binary (see
 [How-to → Install and run](how-to.md#install-and-run-aql)) and this
 repository checked out.
 
@@ -11,165 +12,279 @@ repository checked out.
 > see [AGENTS.md](../AGENTS.md).
 
 Follow along by typing the script into a file as we grow it. We will
-build it up in pieces and run it after each step.
+build it up in pieces and run it after each step. The one rule to keep in
+mind: AQL is forward — the verb comes first, then its arguments
+(`Decision.decide table input`), and the **model comes before the
+input**. Wrap each call in parens (or end it) so the next token isn't
+swallowed.
 
 ---
 
-## Step 1 — import the module and make a filter
+## Step 1 — import the module and build a rule
 
-Create a file `seen.aql` next to `bloom.aql` with this content:
+Create a file `classify.aql` next to `decision.aql` with this content:
 
 ```aql
-import "./bloom.aql" end
+import "./decision.aql"
 
-# AQL currently emits a program's first printed line last; printing one
-# blank line up front keeps the rest in source order.
-"" print
-
-def seen ({n: 10000, p: 0.01} Bloom.make end)
-`params:      ${(seen Bloom.params end)}` print
+def minor-rule (Decision.make-rule {field:"age" op:"lt" value:18} {category:"minor"})
+print (minor-rule) end
 ```
 
-`Bloom.make` takes an options map: `n` is how many distinct items you
-expect (10 000), and `p` is the false-positive rate you will tolerate
-(1 %). Run it:
+A **rule** pairs a `when` (a condition to test) with a `then` (the result
+to return when it matches). `Decision.make-rule` takes the `when` first
+and the `then` second — here, "if `age` is less than 18, the category is
+`minor`". The condition is a plain Map: a `field` to read, an `op` to
+apply, and a `value` to compare against. Run it:
 
 ```console
-$ aql seen.aql
-params:      {k:7 m:95851 n:10000 p:0.01}
+$ aql classify.aql
+{"when": {"field": "age", "op": "lt", "value": 18}, "then": {"category": "minor"}}
 ```
 
-The filter computed two values for you: `m`, the number of bits it will
-use (95 851), and `k`, the number of hash functions (7). You never set
-those directly — they fall out of `n` and `p`. (Curious how? See
-[Explanation → Sizing](explanation.md#sizing-the-filter).)
+That printed Map *is* the rule — a piece of data you can store, pass
+around, and combine. The operator `lt` is one of six binary comparisons:
+`eq`, `neq`, `lt`, `lte`, `gt`, `gte`.
 
 ---
 
-## Step 2 — add some items
+## Step 2 — collect rules into a table and decide
 
-Add three usernames. Each `add` call mutates the filter in place; we
-bind the returned filter to throwaway names (`_1`, `_2`, `_3`) just to
-keep the stack clean. Append below the `params:` line:
-
-```aql
-def _1 (seen Bloom.add "ada" end)
-def _2 (seen Bloom.add "grace" end)
-def _3 (seen Bloom.add "alan" end)
-```
-
-Nothing prints yet — `add` just records the items. Note the `end` after
-each call: AQL words look ahead for arguments, and `end` marks where the
-call stops. Forget it and the next token gets swallowed as an argument.
-
----
-
-## Step 3 — ask what the filter has seen
-
-Now query it. `Bloom.contains` returns a Boolean:
+One rule is a condition; a *list* of rules with a hit policy is a
+**decision table**. Replace the body of `classify.aql` with three rules
+wrapped in a table, then ask it to `decide`:
 
 ```aql
-`ada seen?    ${(seen Bloom.contains "ada" end)}` print
-`grace seen?  ${(seen Bloom.contains "grace" end)}` print
-`linus seen?  ${(seen Bloom.contains "linus" end)}` print
+import "./decision.aql"
+
+def rules [
+  (Decision.make-rule {field:"age" op:"lt"  value:18} {category:"minor"})
+  (Decision.make-rule {field:"age" op:"gte" value:65} {category:"senior"})
+  (Decision.make-rule {field:"age" op:"gte" value:18} {category:"adult"})
+]
+def table (Decision.make-table rules)
+
+print (Decision.decide table {age:12}) end
+print (Decision.decide table {age:70}) end
+print (Decision.decide table {age:30}) end
 ```
 
-Run the whole file:
+`Decision.make-table` defaults to the `"first"` hit policy: rules are
+tried top to bottom and the **first** match wins. So order matters — the
+`gte 18` adult rule sits last, after the `gte 65` senior rule, otherwise a
+70-year-old would match "adult" first. `Decision.decide` dispatches on the
+model's `kind` (here, a table) and runs it against the input Map. Run it:
 
 ```console
-$ aql seen.aql
-params:      {k:7 m:95851 n:10000 p:0.01}
-ada seen?    true
-grace seen?  true
-linus seen?  false
+$ aql classify.aql
+{"category": "minor"}
+{"category": "senior"}
+{"category": "adult"}
 ```
 
-`ada` and `grace` were added, so they read `true`. `linus` was not, and
-reads `false`. That `false` is a *guarantee*: a bloom filter never
-forgets something you added, so a "no" is always correct.
+Age 12 hits the first rule, 70 the second, 30 falls through to the adult
+catch-all. The result is the matching rule's `then`, returned as-is.
 
 ---
 
-## Step 4 — estimate how many items you've added
+## Step 3 — handle a miss
 
-The filter can estimate its own cardinality without storing the items.
-Add:
-
-```aql
-`distinct ~   ${(seen Bloom.count end)}` print
-```
-
-```console
-$ aql seen.aql
-...
-distinct ~   3
-```
-
-We added three distinct items and the estimate is `3`. `count` is an
-*approximation* (it reads the bit pattern, not a stored list), so on a
-fuller filter expect it to drift a little — see
-[Explanation → Estimating cardinality](explanation.md#estimating-cardinality).
-
----
-
-## Step 5 — watch false positives, and see that they track `p`
-
-This is the defining behaviour of a bloom filter, and it is worth seeing
-once. A false positive is an item you never added that nonetheless reads
-`true`, because other items happened to set all of its bits. The whole
-point of `p` is that you get to choose how often this happens.
-
-Let's measure it. Create a second file `falsepos.aql` that sizes a
-filter for 50 items at a 10 % rate, fills it with exactly those 50
-items, then queries 1 000 keys that were never added:
+What if nothing matches? Evaluators never throw on a miss — they return an
+error Map. Trim the table to a single rule and feed it an input that
+slips past:
 
 ```aql
-import "./bloom.aql" end
-"" print
+import "./decision.aql"
 
-def bf ({n: 50, p: 0.1} Bloom.make end)
-`params: ${(bf Bloom.params end)}` print
-
-# add exactly the 50 items it was sized for
-def _ (iota 50 each [ var [[i] bf Bloom.add `item-${i}` end 0 ] ])
-
-# query 1000 keys that were never added
-def hits (iota 1000 each [
-  var [[i]
-    def key `absent-${i}`
-    if (bf Bloom.contains key end) [1] [0]
-  ]
+def strict (Decision.make-table [
+  (Decision.make-rule {field:"age" op:"lt" value:18} {category:"minor"})
 ])
-`false positives among 1000 un-added keys: ${(0 hits [add end] fold)}` print
+print (Decision.decide strict {age:40}) end
 ```
 
 ```console
-$ aql falsepos.aql
-params: {k:3 m:240 n:50 p:0.1}
-false positives among 1000 un-added keys: 79
+$ aql classify.aql
+{"error": "no-match", "ok": false}
 ```
 
-Of the 1 000 keys we never added, 921 correctly read `false` and only
-79 — about 8 % — were false positives, right around the 10 % we asked
-for. Loaded to the capacity it was built for, the filter delivers the
-error rate you specified. Size it for fewer items (smaller `n`) or
-overfill it and that rate climbs; the math behind the trade-off is in
-[Explanation → Sizing](explanation.md#sizing-the-filter).
+No rule matched age 40, so you get `{ok:false error:"no-match"}` rather
+than an exception. Always branch on `result.ok` (or check `result.error`)
+before using a result, since a miss is a value, not a crash. The other
+error strings you might see are `"multiple-matches"`,
+`"unknown-model-kind"`, `"no-branch-match"`, `"node-not-found"`,
+`"unknown-node-kind"`, and `"max-depth-exceeded"`.
+
+---
+
+## Step 4 — a compound condition
+
+A single `field`/`op`/`value` test is often too coarse. `Decision.all-of`
+groups several conditions so that **every** child must hold (there are
+`Decision.any-of` and `Decision.not-of` too). Build a rule that only fires
+for an adult with a high score:
+
+```aql
+import "./decision.aql"
+
+def premium (Decision.make-rule
+  (Decision.all-of [
+    {field:"age"   op:"gte" value:18}
+    {field:"score" op:"gte" value:90}
+  ])
+  {tier:"premium"})
+def vip-table (Decision.make-table [premium])
+
+print (Decision.decide vip-table {age:25 score:95}) end
+print (Decision.decide vip-table {age:25 score:50}) end
+```
+
+```console
+$ aql classify.aql
+{"tier": "premium"}
+{"error": "no-match", "ok": false}
+```
+
+The first input clears both bars and earns `premium`; the second has a low
+score, so the `all-of` fails and the rule misses. One caution: an ordering
+op (`lt`/`lte`/`gt`/`gte`) on a **missing** field raises `not_comparable`,
+because a missing field is `None` and `None` is not comparable. Keep the
+fields your rules read present in the input — both inputs above carry
+`age` and `score`.
+
+---
+
+## Step 5 — collect every match instead of the first
+
+The `"first"` policy stops at the first hit. Swap in the `"collect"`
+policy with `Decision.with-policy` and the table returns a **List** of
+every matching rule's `then` — handy for tagging, where several labels can
+apply at once:
+
+```aql
+import "./decision.aql"
+
+def tags (Decision.with-policy "collect" (Decision.make-table [
+  (Decision.make-rule {field:"age"   op:"gte" value:18} {tag:"adult"})
+  (Decision.make-rule {field:"score" op:"gte" value:50} {tag:"passing"})
+]))
+
+print (Decision.decide tags {age:25 score:80}) end
+```
+
+```console
+$ aql classify.aql
+[{"tag": "adult"}, {"tag": "passing"}]
+```
+
+Both rules matched, so both tags come back in a List. The other policies
+are `"unique"` (exactly one match, else a `"multiple-matches"` or
+`"no-match"` error) and `"priority"` (the matching rule with the highest
+`priority` field wins).
+
+---
+
+## Step 6 — branch with a decision tree
+
+A table is flat. When a decision depends on an earlier answer, reach for a
+**decision tree**: branch nodes route the input to the next node by
+testing a condition, and leaf nodes carry the final result. The node ids
+are Atoms — quote a bare name with `/q`. Build a tree that first splits on
+age, then asks adults whether they're a member:
+
+```aql
+import "./decision.aql"
+
+def tree-nodes [
+  (Decision.make-branch root/q [
+    {when:{field:"age" op:"lt"  value:18} next:"minor"}
+    {when:{field:"age" op:"gte" value:18} next:"adult-check"}
+  ])
+  (Decision.make-leaf minor/q "too-young")
+  (Decision.make-branch adult-check/q [
+    {when:{field:"member" op:"eq" value:true}  next:"vip"}
+    {when:{field:"member" op:"eq" value:false} next:"guest"}
+  ])
+  (Decision.make-leaf vip/q   "welcome-vip")
+  (Decision.make-leaf guest/q "welcome-guest")
+]
+def tree (Decision.make-tree root/q tree-nodes)
+
+print (Decision.decide tree {age:12 member:true}) end
+print (Decision.decide tree {age:40 member:true}) end
+print (Decision.decide tree {age:40 member:false}) end
+```
+
+`Decision.make-tree` takes the `root` node id and the list of nodes;
+`Decision.decide` walks from the root, following each branch's `next`
+until it reaches a leaf and returns that leaf's `result`. Run it:
+
+```console
+$ aql classify.aql
+too-young
+welcome-vip
+welcome-guest
+```
+
+The 12-year-old stops at the `minor` leaf and never reaches the
+membership check. The two adults both pass the first branch, then split on
+`member` at `adult-check`. Same `Decision.decide`, same input Maps — only
+the model changed.
+
+---
+
+## Step 7 — peek at the primitives
+
+`decide` is built from two smaller pieces you can call directly while
+debugging. `Decision.eval-cond` tests one condition against an input;
+`Decision.apply-op` is the raw comparison underneath it (`lhs op rhs`,
+with the right-hand side first — `apply-op rhs op lhs`):
+
+```aql
+import "./decision.aql"
+
+print (Decision.eval-cond {field:"age" op:"gte" value:18} {age:25}) end
+print (Decision.eval-cond {field:"age" op:"gte" value:18} {age:15}) end
+print (Decision.apply-op 18 "gte" 25) end
+print (Decision.apply-op true "is_true") end
+```
+
+```console
+$ aql classify.aql
+true
+false
+true
+true
+```
+
+The last line uses a **unary** op. The four unary ops — `is_true`,
+`is_false`, `is_null`, `is_not_null` — take no `value` and are reached
+only through the two-argument `Decision.apply-op rhs op` form, not through
+a condition's `op` field. Reach for these when you want to inspect a
+single test in isolation.
 
 ---
 
 ## What you've learned
 
-- `Bloom.make` sizes a filter from a target `n` and `p`.
-- `Bloom.add` records items; `Bloom.contains` queries them.
-- A `false` from `contains` is always correct; a `true` is "probably,"
-  with a tunable false-positive rate.
-- `Bloom.count` estimates how many distinct items you added.
-- Under-sizing a filter produces false positives — by design.
+- `Decision.make-rule when then` builds a rule; `Decision.make-table`
+  collects rules into a table (default hit policy `"first"`).
+- `Decision.decide model input` runs a table *or* a tree against an input
+  Map — the model comes first.
+- A miss is a value, not a throw: `{ok:false error:"no-match"}`. Check
+  `result.ok` before trusting a result.
+- `Decision.all-of` / `any-of` / `not-of` combine conditions; ordering ops
+  on a missing field raise `not_comparable`.
+- `Decision.with-policy "collect"` returns every match as a List;
+  `"unique"` and `"priority"` are the other policies.
+- A decision tree (`make-branch` / `make-leaf` / `make-tree`, ids as
+  Atoms) routes through branches to a leaf when one answer depends on
+  another.
 
 ## Where to go next
 
-- Solve specific problems with the [How-to guides](how-to.md) — sizing,
-  merging, persistence, running the tests.
-- Look up exact signatures in the [Reference](reference.md).
-- Understand the machinery in the [Explanation](explanation.md).
+- Solve specific problems with the [How-to guides](how-to.md) — hit
+  policies, trees, testing your models, running the suites.
+- Look up exact signatures and record shapes in the
+  [Reference](reference.md).
+- Understand the design — the Comparable surface, generic rules, the
+  hit-policy semantics — in the [Explanation](explanation.md).

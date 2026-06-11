@@ -1,0 +1,166 @@
+# Property-based tests for the Decision library — DECLARATIVE SPEC FORMAT.
+#
+# This file exercises one of aql:test's two property-test surfaces: the
+# declarative `PropertySpec`. `Test.prop` builds a spec as *data* —
+#
+#   Test.prop NAME [GEN-BODY] [PROPERTY-BODY]   →   PropertySpec map
+#
+# — which `Test.run-property` then runs (at the default 100 iterations).
+# Specs are values, so we assemble them into a list and run the list.
+#
+# GEN-BODY runs with `r` (a seeded aql:rand instance) in scope and must
+# leave exactly one value on the stack. PROPERTY-BODY takes that value
+# and must return a Boolean. A single false (or an error) fails the
+# property and reports the offending input.
+#
+# `if` is written all-forward (`if cond [then] [else]`) throughout.
+#
+# GOTCHA honoured here: an ordering op (lt/lte/gt/gte) on a MISSING field
+# raises `not_comparable` (a missing field is None, not Comparable). Every
+# generated input below keeps its compared fields PRESENT, so the ordering
+# ops in these properties always have Comparable operands. (Unary ops —
+# is_true/is_null/… — are NOT reachable through eval-cond, which always
+# supplies a `value`; they live on the direct two-arg `apply-op` surface,
+# which property 2 stays clear of by using only eq/neq.)
+#
+# Run:
+#   aql test/decision_prop_spec.aql
+
+
+import "aql:test" end
+import "aql:rand" end
+import "./decision.aql" end
+
+
+# --- reporting helper ----------------------------------------------
+
+# Print one PropertyResult as a pass/fail line.
+def report fn [
+  [res:Map] [] [
+    def ok (res "ok" get)
+    def nm (res "name" get)
+    def msg (if ok
+      [`ok   ${nm} (${(res "runs" get)} runs)`]
+      [`FAIL ${nm}  failing-input: ${(res "failing-input" get)}`])
+    msg print
+  ]
+]
+
+
+# --- the spec suite, built as data ---------------------------------
+#
+# Each entry is a PropertySpec value. All are cheap per iteration, so
+# the default 100-run budget is comfortable.
+
+def specs [
+
+  # 1. eval-cond with op "eq" is true exactly when input.(field) equals
+  #    the condition's value. Generate the stored value and the input
+  #    value independently from the same small range so both the equal
+  #    and not-equal cases occur; the field is always present.
+  (Test.prop "eval-cond-eq-iff-equal"
+    [ do { stored: [r.int 0 5], actual: [r.int 0 5] } ]
+    [ var [[g]
+        def stored (g "stored" get)
+        def actual (g "actual" get)
+        def got (Decision.eval-cond {field:"v" op:"eq" value:stored} {v:actual})
+        (got eq (actual eq stored))
+    ] ])
+
+  # 2. apply-op "eq" and "neq" are complementary for scalars: for any two
+  #    generated integers, eq is exactly the negation of neq. eq/neq are
+  #    total (defined for every value), so no Comparable surface is needed.
+  (Test.prop "apply-op-eq-neq-complementary"
+    [ do { a: [r.int 0 9], b: [r.int 0 9] } ]
+    [ var [[g]
+        def a (g "a" get)
+        def b (g "b" get)
+        def is-eq  (Decision.apply-op b "eq"  a)
+        def is-neq (Decision.apply-op b "neq" a)
+        (is-eq eq (is-neq not))
+    ] ])
+
+  # 3. A first-policy table whose first rule is always-true returns that
+  #    rule's `then` for ANY input. The always-true rule uses eq on a
+  #    `flag` field we always set to true (eq tolerates any value and the
+  #    field is present), so it fires before any later rule regardless of
+  #    the generated `v`. (We compare the result's `hit` field rather than
+  #    the whole `then` Map: scalar field equality is the robust check.)
+  (Test.prop "first-policy-always-true-rule-wins"
+    [ r.int 0 100 ]
+    [ var [[v]
+        def tbl (Decision.make-table [
+          (Decision.make-rule {field:"flag" op:"eq"  value:true} {hit:"first"})
+          (Decision.make-rule {field:"v"    op:"gte" value:0}    {hit:"second"})
+        ])
+        def got (Decision.eval-table tbl {flag:true v:v})
+        ((got get "hit") eq "first")
+    ] ])
+
+  # 4. A collect-policy table returns a List whose length equals the count
+  #    of matching rules. The expected count is computed independently by
+  #    folding eval-pred over the same rules. All rules compare `v`, which
+  #    is always present, so the ordering ops never see a missing field.
+  (Test.prop "collect-length-equals-match-count"
+    [ r.int 0 40 ]
+    [ var [[v]
+        def rules [
+          (Decision.make-rule {field:"v" op:"gte" value:10} {t:"a"})
+          (Decision.make-rule {field:"v" op:"gte" value:20} {t:"b"})
+          (Decision.make-rule {field:"v" op:"gte" value:30} {t:"c"})
+        ]
+        def tbl (Decision.with-policy "collect" (Decision.make-table rules))
+        def input {v:v}
+        def collected (Decision.eval-table tbl input)
+        def expected (0 (rules each [
+          var [[rule] (if (Decision.eval-pred (rule get "when") input) [1] [0]) ]
+        ]) [add end] fold)
+        ((collected size) eq expected)
+    ] ])
+
+  # 5. A single-leaf tree (root IS a leaf) returns that leaf's result for
+  #    ANY input — no branch is consulted, so the input is irrelevant and
+  #    no field is compared.
+  (Test.prop "single-leaf-tree-returns-result"
+    [ r.int 0 1000 ]
+    [ var [[v]
+        def tree {kind:"tree" root:"only" nodes:[
+          {id:"only" kind:"leaf" result:"the-result"}
+        ]}
+        def got (Decision.eval-tree tree {anything:v})
+        (got eq "the-result")
+    ] ])
+
+  # 6. all-of of a single condition is equivalent to that condition alone:
+  #    eval-pred (all-of [c]) input == eval-cond c input, for any input.
+  #    The condition compares `v` with gte and `v` is always present, so
+  #    both sides evaluate the same ordering op on Comparable operands.
+  (Test.prop "all-of-one-cond-equals-cond"
+    [ r.int 0 40 ]
+    [ var [[v]
+        def c {field:"v" op:"gte" value:18}
+        def input {v:v}
+        def via-pred (Decision.eval-pred (Decision.all-of [c]) input)
+        def via-cond (Decision.eval-cond c input)
+        (via-pred eq via-cond)
+    ] ])
+
+]
+
+
+# --- run every spec ------------------------------------------------
+
+def _ (specs each [
+  var [[s]
+    (s Test.run-property end) report
+    0
+  ]
+])
+
+
+# --- summary -------------------------------------------------------
+
+"---" print
+"fail count: " print Test.fail-count end print
+0 Test.fail-count end Assert.equal end
+"all green" print

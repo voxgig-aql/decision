@@ -1,0 +1,229 @@
+# decision direct unit tests using aql:test's imperative API.
+#
+# The sibling file `test/decision_unit_spec.aql` covers the same kind of
+# example-based checks through the declarative spec surface
+# (`Test.spec` / `Test.case` / `Test.run-spec`).
+#
+# Run:
+#   aql test/decision_unit_test.aql
+
+
+import "aql:test" end
+import "./decision.aql" end
+
+
+# --- apply-op: the primitive compare (lhs op rhs) ------------------
+#
+# Call form is `Decision.apply-op rhs op lhs` — it computes lhs op rhs.
+
+[
+  # binary, Comparable
+  true  (Decision.apply-op 18 "gte" 25) Assert.equal end   # 25 gte 18
+  false (Decision.apply-op 25 "gte" 18) Assert.equal end   # 18 gte 25
+  true  (Decision.apply-op 5  "eq"  5)  Assert.equal end
+  false (Decision.apply-op 5  "neq" 5)  Assert.equal end
+  true  (Decision.apply-op 10 "lt"  3)  Assert.equal end   #  3 lt 10
+  false (Decision.apply-op 3  "lt"  10) Assert.equal end   # 10 lt  3
+  # Strings are Comparable
+  false (Decision.apply-op "a" "lt" "b") Assert.equal end  #  b lt  a
+] "apply-op-binary" Test.test end
+
+
+# --- apply-op: the unary is_* ops (no rhs/value) -------------------
+#
+# The unary form takes only `rhs op` (the operand and the op string).
+
+[
+  true  (Decision.apply-op true  "is_true")     Assert.equal end
+  false (Decision.apply-op false "is_true")     Assert.equal end
+  true  (Decision.apply-op false "is_false")    Assert.equal end
+  false (Decision.apply-op true  "is_false")    Assert.equal end
+  false (Decision.apply-op 5     "is_null")     Assert.equal end
+  true  (Decision.apply-op 5     "is_not_null") Assert.equal end
+] "apply-op-unary" Test.test end
+
+
+# --- apply-op: a non-Comparable operand on an ordering op raises ---
+
+[
+  [Decision.apply-op 5 "lt" {a:1}] Assert.throws end
+] "apply-op-not-comparable" Test.test end
+
+
+# --- eval-cond: one condition against an input map -----------------
+
+[
+  true  (Decision.eval-cond {field:"age"    op:"gte" value:18}       {age:25})            Assert.equal end
+  false (Decision.eval-cond {field:"age"    op:"gte" value:18}       {age:15})            Assert.equal end
+  true  (Decision.eval-cond {field:"status" op:"eq"  value:"active"} {status:"active"})   Assert.equal end
+  false (Decision.eval-cond {field:"status" op:"eq"  value:"active"} {status:"inactive"}) Assert.equal end
+] "eval-cond" Test.test end
+
+
+# --- eval-pred: compound all / any / not groups -------------------
+
+[
+  # all-of: every child must hold
+  true  (Decision.eval-pred {kind:"group" op:"all" children:[
+    {field:"age"   op:"gte" value:18}
+    {field:"score" op:"gt"  value:50}
+  ]} {age:25 score:80}) Assert.equal end
+  false (Decision.eval-pred {kind:"group" op:"all" children:[
+    {field:"age"   op:"gte" value:18}
+    {field:"score" op:"gt"  value:50}
+  ]} {age:25 score:30}) Assert.equal end
+  # any-of: at least one child must hold
+  true  (Decision.eval-pred {kind:"group" op:"any" children:[
+    {field:"age"   op:"gte" value:18}
+    {field:"score" op:"gt"  value:50}
+  ]} {age:10 score:80}) Assert.equal end
+  # not-of: negate a single condition
+  true  (Decision.eval-pred {kind:"group" op:"not" children:[{field:"age" op:"lt" value:18}]} {age:25}) Assert.equal end
+] "eval-pred" Test.test end
+
+
+# --- eval-table: hit policy first (the default) -------------------
+
+[
+  def tbl (Decision.make-table [
+    (Decision.make-rule {field:"age" op:"lt"  value:18} {category:"minor"})
+    (Decision.make-rule {field:"age" op:"gte" value:18} {category:"adult"})
+  ])
+  {category:"adult"} (Decision.eval-table tbl {age:25}) Assert.equal end
+  {category:"minor"} (Decision.eval-table tbl {age:12}) Assert.equal end
+] "eval-table-first" Test.test end
+
+
+# --- eval-table: no rule matches → error result -------------------
+
+[
+  def tbl (Decision.make-table [(Decision.make-rule {field:"age" op:"gt" value:100} {x:1})])
+  {ok:false error:"no-match"} (Decision.eval-table tbl {age:25}) Assert.equal end
+] "eval-table-no-match" Test.test end
+
+
+# --- eval-table: hit policy unique --------------------------------
+
+[
+  def tbl (Decision.with-policy "unique" (Decision.make-table [
+    (Decision.make-rule {field:"score" op:"lt"  value:50} {grade:"fail"})
+    (Decision.make-rule {field:"score" op:"gte" value:50} {grade:"pass"})
+  ]))
+  {grade:"pass"} (Decision.eval-table tbl {score:75}) Assert.equal end
+] "eval-table-unique" Test.test end
+
+
+# --- eval-table: unique with >1 match → multiple-matches ----------
+
+[
+  def tbl (Decision.with-policy "unique" (Decision.make-table [
+    (Decision.make-rule {field:"age"   op:"gte" value:18} {a:1})
+    (Decision.make-rule {field:"score" op:"gte" value:50} {b:2})
+  ]))
+  {ok:false error:"multiple-matches"} (Decision.eval-table tbl {age:25 score:80}) Assert.equal end
+] "eval-table-multiple-matches" Test.test end
+
+
+# --- eval-table: hit policy collect → a List of every match -------
+
+[
+  def tbl (Decision.with-policy "collect" (Decision.make-table [
+    (Decision.make-rule {field:"age"   op:"gte" value:18} {tag:"adult"})
+    (Decision.make-rule {field:"score" op:"gte" value:50} {tag:"passing"})
+  ]))
+  [{tag:"adult"} {tag:"passing"}] (Decision.eval-table tbl {age:25 score:80}) Assert.equal end
+] "eval-table-collect" Test.test end
+
+
+# --- eval-table: hit policy priority → the highest-priority match -
+
+[
+  def tbl (Decision.with-policy "priority" (Decision.make-table [
+    {when:{field:"age"   op:"gte" value:18} then:{label:"low"}  priority:1}
+    {when:{field:"score" op:"gte" value:50} then:{label:"high"} priority:5}
+  ]))
+  {label:"high"} (Decision.eval-table tbl {age:25 score:80}) Assert.equal end
+] "eval-table-priority" Test.test end
+
+
+# --- eval-tree: branch → leaf (Map result) ------------------------
+
+[
+  def tree {kind:"tree" root:"root" nodes:[
+    {id:"root" kind:"branch" branches:[
+      {when:{field:"age" op:"lt"  value:18} next:"minor"}
+      {when:{field:"age" op:"gte" value:18} next:"adult"}
+    ]}
+    {id:"minor" kind:"leaf" result:{category:"minor"}}
+    {id:"adult" kind:"leaf" result:{category:"adult"}}
+  ]}
+  {category:"adult"} (Decision.eval-tree tree {age:25}) Assert.equal end
+] "eval-tree-branch-leaf" Test.test end
+
+
+# --- eval-tree: scalar leaf result --------------------------------
+
+[
+  def tree {kind:"tree" root:"root" nodes:[
+    {id:"root" kind:"branch" branches:[
+      {when:{field:"age" op:"lt"  value:18} next:"minor"}
+      {when:{field:"age" op:"gte" value:18} next:"adult"}
+    ]}
+    {id:"minor" kind:"leaf" result:"too-young"}
+    {id:"adult" kind:"leaf" result:"welcome"}
+  ]}
+  "too-young" (Decision.eval-tree tree {age:12}) Assert.equal end
+] "eval-tree-scalar-leaf" Test.test end
+
+
+# --- eval-tree: multi-level walk (branch → branch → leaf) ---------
+
+[
+  def tree {kind:"tree" root:"check-age" nodes:[
+    {id:"check-age" kind:"branch" branches:[
+      {when:{field:"age" op:"lt"  value:18} next:"reject"}
+      {when:{field:"age" op:"gte" value:18} next:"check-score"}
+    ]}
+    {id:"check-score" kind:"branch" branches:[
+      {when:{field:"score" op:"gte" value:80} next:"approve"}
+      {when:{field:"score" op:"lt"  value:80} next:"review"}
+    ]}
+    {id:"reject"  kind:"leaf" result:"rejected"}
+    {id:"approve" kind:"leaf" result:"approved"}
+    {id:"review"  kind:"leaf" result:"needs-review"}
+  ]}
+  "approved"     (Decision.eval-tree tree {age:25 score:90}) Assert.equal end
+  "needs-review" (Decision.eval-tree tree {age:25 score:60}) Assert.equal end
+] "eval-tree-multi-level" Test.test end
+
+
+# --- decide: dispatch on model.kind (table / tree) ----------------
+
+[
+  def tbl (Decision.make-table [(Decision.make-rule {field:"x" op:"gt" value:0} {sign:"positive"})])
+  {sign:"positive"} (Decision.decide tbl {x:5}) Assert.equal end
+  def tree {kind:"tree" root:"root" nodes:[
+    {id:"root" kind:"branch" branches:[
+      {when:{field:"age" op:"lt"  value:18} next:"minor"}
+      {when:{field:"age" op:"gte" value:18} next:"adult"}
+    ]}
+    {id:"minor" kind:"leaf" result:"too-young"}
+    {id:"adult" kind:"leaf" result:"welcome"}
+  ]}
+  "welcome" (Decision.decide tree {age:40}) Assert.equal end
+] "decide-dispatch" Test.test end
+
+
+# --- decide: an unknown model kind → unknown-model-kind -----------
+
+[
+  {ok:false error:"unknown-model-kind"} (Decision.decide {kind:"bogus"} {x:1}) Assert.equal end
+] "decide-unknown-model-kind" Test.test end
+
+
+# --- summary -------------------------------------------------------
+
+"---" print
+"fail count: " print Test.fail-count end print
+0 Test.fail-count end Assert.equal end
+"all green" print

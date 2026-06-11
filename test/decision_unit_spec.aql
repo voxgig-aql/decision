@@ -1,0 +1,264 @@
+# Example-based unit tests for decision — DECLARATIVE SPEC FORMAT.
+#
+# This file is the spec-format sibling of `test/decision_unit_test.aql`.
+# Where that file would drive example checks imperatively (`Test.test`
+# with `Assert.equal`), this one expresses them as *data*: a list of
+# `TestSpec` values that `Test.run-spec` walks and dispatches. The cases
+# are ported from the module's own declarative spec,
+# `lang/go/modules/decision_spec.aql` (cond / pred / table / tree).
+#
+# A TestSpec is `{name, subject, cases, subs}`:
+#   - `subject` is the word to exercise, named as a dotted String
+#     (e.g. "Decision.eval-table"); the runner splits it into `get`
+#     chains and dispatches the resolved word.
+#   - each case is `{name, in, out}`: the `in` list is spread onto the
+#     stack (deepest element first), the subject is dispatched, and the
+#     top-of-stack result is deep-compared (`deq`) against `out`.
+#
+# ARG ORDER (critical). The subject's signature dictates stack-top-down
+# order: for a two-arg signature `[model:Map input:Map]` the args list
+# is `[input, model]` — input pushed first (deepest), the model on top
+# (matches sig[0]). So for subject "Decision.eval-table" a case's `in`
+# is [input, table]; likewise [input, cond] for eval-cond, [input, pred]
+# for eval-pred, and [input, tree] for eval-tree. All inputs are plain
+# Map literals; the evaluators only read fields, so no builders are
+# needed inline.
+#
+# Run (from the directory that holds ./decision.aql):
+#   aql test/decision_unit_spec.aql
+
+
+import "aql:test" end
+import "./decision.aql" end
+
+
+# --- the spec suite, built as data ---------------------------------
+#
+# Four TestSpec values, one per evaluator, each carrying empty `subs`.
+
+def specs [
+
+  # eval-cond: read input.(cond.field) and apply cond.op against
+  # cond.value. Fields are present, so ordering ops are well-defined.
+  {
+    name:    "eval-cond"
+    subject: "Decision.eval-cond"
+    cases: [
+      {
+        name: "age gte true"
+        in:   [ {age:25} {field:"age" op:"gte" value:18} ]
+        out:  true
+      }
+      {
+        name: "age gte false"
+        in:   [ {age:15} {field:"age" op:"gte" value:18} ]
+        out:  false
+      }
+      {
+        name: "status eq true"
+        in:   [ {status:"active"} {field:"status" op:"eq" value:"active"} ]
+        out:  true
+      }
+    ]
+    subs: []
+  }
+
+  # eval-pred: evaluate an all/any/not group against the input.
+  {
+    name:    "eval-pred"
+    subject: "Decision.eval-pred"
+    cases: [
+      {
+        name: "all-of true"
+        in:   [
+          {age:25 score:80}
+          {kind:"group" op:"all" children:[
+            {field:"age"   op:"gte" value:18}
+            {field:"score" op:"gt"  value:50}
+          ]}
+        ]
+        out:  true
+      }
+      {
+        name: "all-of false"
+        in:   [
+          {age:25 score:30}
+          {kind:"group" op:"all" children:[
+            {field:"age"   op:"gte" value:18}
+            {field:"score" op:"gt"  value:50}
+          ]}
+        ]
+        out:  false
+      }
+      {
+        name: "any-of true"
+        in:   [
+          {age:10 score:80}
+          {kind:"group" op:"any" children:[
+            {field:"age"   op:"gte" value:18}
+            {field:"score" op:"gt"  value:50}
+          ]}
+        ]
+        out:  true
+      }
+      {
+        name: "not-of true"
+        in:   [
+          {age:25}
+          {kind:"group" op:"not" children:[{field:"age" op:"lt" value:18}]}
+        ]
+        out:  true
+      }
+    ]
+    subs: []
+  }
+
+  # eval-table: run a table under its hit policy; misses return an
+  # {ok:false error:…} Map rather than throwing.
+  {
+    name:    "eval-table"
+    subject: "Decision.eval-table"
+    cases: [
+      {
+        name: "first hit adult"
+        in:   [
+          {age:25}
+          {kind:"table" hit-policy:"first" rules:[
+            {when:{field:"age" op:"lt"  value:18} then:{category:"minor"}}
+            {when:{field:"age" op:"gte" value:18} then:{category:"adult"}}
+          ]}
+        ]
+        out:  {category:"adult"}
+      }
+      {
+        name: "first hit minor"
+        in:   [
+          {age:12}
+          {kind:"table" hit-policy:"first" rules:[
+            {when:{field:"age" op:"lt"  value:18} then:{category:"minor"}}
+            {when:{field:"age" op:"gte" value:18} then:{category:"adult"}}
+          ]}
+        ]
+        out:  {category:"minor"}
+      }
+      {
+        name: "unique pass"
+        in:   [
+          {score:75}
+          {kind:"table" hit-policy:"unique" rules:[
+            {when:{field:"score" op:"lt"  value:50} then:{grade:"fail"}}
+            {when:{field:"score" op:"gte" value:50} then:{grade:"pass"}}
+          ]}
+        ]
+        out:  {grade:"pass"}
+      }
+      {
+        name: "no-match"
+        in:   [
+          {age:25}
+          {kind:"table" hit-policy:"first" rules:[
+            {when:{field:"age" op:"gt" value:100} then:{x:1}}
+          ]}
+        ]
+        out:  {ok: false error: "no-match"}
+      }
+      {
+        name: "compound all-of"
+        in:   [
+          {age:25 score:95}
+          {kind:"table" hit-policy:"first" rules:[
+            {
+              when: {kind:"group" op:"all" children:[
+                {field:"age"   op:"lt"  value:30}
+                {field:"score" op:"gte" value:90}
+              ]}
+              then: {tier:"premium"}
+            }
+            {when:{field:"score" op:"gte" value:50} then:{tier:"standard"}}
+          ]}
+        ]
+        out:  {tier:"premium"}
+      }
+    ]
+    subs: []
+  }
+
+  # eval-tree: walk branches to a leaf; leaf results may be Maps or
+  # scalars, and multi-level trees chain branch → branch → leaf.
+  {
+    name:    "eval-tree"
+    subject: "Decision.eval-tree"
+    cases: [
+      {
+        name: "tree adult"
+        in:   [
+          {age:25}
+          {kind:"tree" root:"root" nodes:[
+            {id:"root" kind:"branch" branches:[
+              {when:{field:"age" op:"lt"  value:18} next:"minor"}
+              {when:{field:"age" op:"gte" value:18} next:"adult"}
+            ]}
+            {id:"minor" kind:"leaf" result:{category:"minor"}}
+            {id:"adult" kind:"leaf" result:{category:"adult"}}
+          ]}
+        ]
+        out:  {category:"adult"}
+      }
+      {
+        name: "tree minor scalar"
+        in:   [
+          {age:12}
+          {kind:"tree" root:"root" nodes:[
+            {id:"root" kind:"branch" branches:[
+              {when:{field:"age" op:"lt"  value:18} next:"minor"}
+              {when:{field:"age" op:"gte" value:18} next:"adult"}
+            ]}
+            {id:"minor" kind:"leaf" result:"too-young"}
+            {id:"adult" kind:"leaf" result:"welcome"}
+          ]}
+        ]
+        out:  "too-young"
+      }
+      {
+        name: "tree multi-level approved"
+        in:   [
+          {age:25 score:90}
+          {kind:"tree" root:"check-age" nodes:[
+            {id:"check-age" kind:"branch" branches:[
+              {when:{field:"age" op:"lt"  value:18} next:"reject"}
+              {when:{field:"age" op:"gte" value:18} next:"check-score"}
+            ]}
+            {id:"check-score" kind:"branch" branches:[
+              {when:{field:"score" op:"gte" value:80} next:"approve"}
+              {when:{field:"score" op:"lt"  value:80} next:"review"}
+            ]}
+            {id:"reject"  kind:"leaf" result:"rejected"}
+            {id:"approve" kind:"leaf" result:"approved"}
+            {id:"review"  kind:"leaf" result:"needs-review"}
+          ]}
+        ]
+        out:  "approved"
+      }
+    ]
+    subs: []
+  }
+
+]
+
+
+# --- run every spec ------------------------------------------------
+
+def _ (specs each [
+  var [[s]
+    s Test.run-spec end
+    0
+  ]
+])
+
+
+# --- summary -------------------------------------------------------
+
+"---" print
+"fail count: " print Test.fail-count end print
+0 Test.fail-count end Assert.equal end
+"all green" print
