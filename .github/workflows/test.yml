@@ -1,6 +1,6 @@
 name: tests
 
-# The bloom-filter module is written in AQL, so CI has to build the
+# The decision module is written in AQL, so CI has to build the
 # `aql` interpreter from source before it can run anything. The
 # language has no tagged release yet and has shipped breaking changes
 # between commits, so we pin AQL_REF to the exact commit this module is
@@ -15,13 +15,13 @@ on:
 env:
   # aql-lang/aql @ main, 2026-06-06. Pinned to the exact commit this
   # module is verified against.
-  AQL_REF: db828ecb6ee1d161ff177134478f42c56484f051
+  AQL_REF: 958c379b12295652c739a88f2f198726d48897fb
 
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - name: Check out bloom-filter
+      - name: Check out decision
         uses: actions/checkout@v4
 
       - name: Set up Go
@@ -67,22 +67,22 @@ jobs:
       # Each suite ends with `0 test.fail-count end assert.equal`, so a
       # failure makes aql exit non-zero and fails the step.
       - name: Unit tests (direct)
-        run: aql test/bloom_unit_test.aql
+        run: aql test/decision_unit_test.aql
 
       - name: Unit tests (spec format)
-        run: aql test/bloom_unit_spec.aql
+        run: aql test/decision_unit_spec.aql
 
       - name: Property tests (direct)
-        run: aql test/bloom_prop_test.aql
+        run: aql test/decision_prop_test.aql
 
       - name: Property tests (spec format)
-        run: aql test/bloom_prop_spec.aql
+        run: aql test/decision_prop_spec.aql
 
       - name: Smoke test
-        run: aql test/bloom_smoke_test.aql
+        run: aql test/decision_smoke_test.aql
 
       # Advisory static check — NOT a gate. `aql check` is a structural type
-      # checker, but this library exports its words by reference (`make-bloom/r`,
+      # checker, but this library exports its words by reference (`cond/r`,
       # …) and dispatches dynamically, so the checker can't trace those exports
       # and reports false `unused_def`/`no_signature` diagnostics on code the
       # suites prove correct. We run it with `--soft` (always exits 0) and
@@ -91,7 +91,7 @@ jobs:
       # real gate.
       - name: Static check (advisory, non-gating)
         continue-on-error: true
-        run: aql check --soft bloom.aql
+        run: aql check --soft decision.aql
 
   # Lightweight guard for the agent-skill packaging and the pinned-ref single
   # source of truth (no aql needed). The plugin must bundle its own copy of the
@@ -101,13 +101,13 @@ jobs:
   consistency:
     runs-on: ubuntu-latest
     steps:
-      - name: Check out bloom-filter
+      - name: Check out decision
         uses: actions/checkout@v4
 
       - name: SKILL.md copies are in sync
         run: |
-          canonical=.claude/skills/bloom-filter-aql/SKILL.md
-          bundled=plugins/bloom-filter-aql/skills/bloom-filter-aql/SKILL.md
+          canonical=.claude/skills/decision-aql/SKILL.md
+          bundled=plugins/decision-aql/skills/decision-aql/SKILL.md
           if ! diff -u "$canonical" "$bundled"; then
             echo "::error file=$bundled::Plugin skill has drifted from $canonical"
             echo "Fix by copying the canonical skill over the bundled one:"
@@ -119,7 +119,7 @@ jobs:
       - name: JSON manifests are valid
         run: |
           for j in .claude-plugin/marketplace.json \
-                   plugins/bloom-filter-aql/.claude-plugin/plugin.json \
+                   plugins/decision-aql/.claude-plugin/plugin.json \
                    api.json; do
             if python3 -c "import json,sys; json.load(open(sys.argv[1]))" "$j"; then
               echo "ok: $j"

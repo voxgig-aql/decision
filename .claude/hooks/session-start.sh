@@ -18,7 +18,7 @@ log() { echo "[session-start] $*" >&2; }
 
 # Keep this in lockstep with ci/test.yml's AQL_REF (the consistency CI job
 # fails if they drift). Full 40-char commit so the build is reproducible.
-AQL_REF=db828ecb6ee1d161ff177134478f42c56484f051
+AQL_REF=958c379b12295652c739a88f2f198726d48897fb
 BIN_DIR="$HOME/.local/bin"
 AQL="$BIN_DIR/aql"
 
@@ -54,9 +54,9 @@ fi
 
 # Fast confidence check: run the smoke test if aql is usable. Never fail the
 # session on a check error.
-if [ -x "$AQL" ] && [ -f "$CLAUDE_PROJECT_DIR/test/bloom_smoke_test.aql" ]; then
-  if ( cd "$CLAUDE_PROJECT_DIR" && "$AQL" test/bloom_smoke_test.aql >/dev/null 2>&1 ); then
-    log "Smoke check passed (aql test/bloom_smoke_test.aql)."
+if [ -x "$AQL" ] && [ -f "$CLAUDE_PROJECT_DIR/test/decision_smoke_test.aql" ]; then
+  if ( cd "$CLAUDE_PROJECT_DIR" && "$AQL" test/decision_smoke_test.aql >/dev/null 2>&1 ); then
+    log "Smoke check passed (aql test/decision_smoke_test.aql)."
   else
     log "NOTE: smoke check did not pass; toolchain may be incomplete."
   fi

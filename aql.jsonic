@@ -1,6 +1,6 @@
-name: bloom-filter
+name: decision
 major: 0
 minor: 1
 patch: 0
-main: bloom.aql
-files: [bloom.aql]
+main: decision.aql
+files: [decision.aql]
