@@ -9,7 +9,7 @@ Declarative **decision logic**: express business rules as data — a
 **condition**, a compound **predicate**, a **decision table** (rules + hit
 policy), or a **decision tree** (branch/leaf nodes) — then evaluate against an
 input `Map`. Public surface = the `Decision` namespace. Everything below is
-verified against `aql @ 958c379b` (pinned) and `aql @ 7193a7d3` (latest main).
+verified against `aql @ 958c379b` (pinned) and `aql @ 5aed3834` (latest main).
 
 ## Import
 

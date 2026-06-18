@@ -6,16 +6,20 @@ originally targeted) and `db828ec` (the older ref the sibling bloom-filter/trie
 libraries pin). Every finding below was reproduced against the actual binaries;
 the commands and output are quoted verbatim.
 
-> **Re-reviewed 2026-06-11 against `main` @ `7193a7d3`.** Upstream responded
-> the same day (`1981f601`, *"fix: decision DX report"*): findings **3, 4, 6,
-> 8 are fixed**, **5 and 7** got their documentation halves (the `check` lints
-> remain open), **2 is partially fixed** (the hint never fires for
-> namespace-exposed words — this library's case), and **1 is unchanged**. All
-> five test suites pass unchanged on `7193a7d3`, so bumping the pin is
-> verified safe — but the bump itself needs a maintainer, because the
-> workflow file holding the canonical `AQL_REF` requires `workflow` scope to
-> edit (see [the bump checklist](#re-review-status-on-latest-main-7193a7d3)).
-> Verified evidence per finding:
+> **Re-reviewed 2026-06-11 against `main` @ `7193a7d3`, re-confirmed
+> 2026-06-18 against `main` @ `5aed3834`.** Upstream responded the same day
+> the report was filed (`1981f601`, *"fix: decision DX report"*): findings
+> **3, 4, 6, 8 are fixed**, **5 and 7** got their documentation halves (the
+> `check` lints remain open), **2 is partially fixed** (the hint never fires
+> for namespace-exposed words — this library's case), and **1 is unchanged**.
+> Every status held on the re-confirm (`5aed3834` is ~200 commits later —
+> bytecode-compiler, checker-accuracy, and vault work — none of it touches
+> this library). All five test suites pass unchanged and every idiom block is
+> byte-identical on both refs, so bumping the pin is verified safe — but the
+> bump itself needs a maintainer, because the workflow file holding the
+> canonical `AQL_REF` requires `workflow` scope to edit (see
+> [the bump checklist](#re-review-status-on-latest-main-7193a7d3)). Verified
+> evidence per finding:
 > [Re-review: status on latest main](#re-review-status-on-latest-main-7193a7d3).
 
 This report comes out of porting the interpreter's internal `aql:decision`
@@ -62,6 +66,16 @@ five of this library's test suites pass unchanged on `7193a7d3`, every
 AGENTS.md/skill code block re-verified, and `aql check --soft` behaves as
 before — so adopting it is safe. Per-finding status, each re-verified
 against the freshly built binary:
+
+> **Re-confirmed 2026-06-18 against `main` @ `5aed3834`** (the newest main,
+> ~200 commits past `7193a7d3` — mostly the bytecode-compiler effort, checker
+> accuracy, and vault TUI). Every per-finding status below is unchanged, all
+> five suites still pass, all idiom blocks emit identical output, and the
+> advisory `aql check --soft` noise even dropped (51→39 errors, from the
+> checker-accuracy work). The findings still open — **1** and the
+> namespaced-word half of **2** — are still open verbatim. If the pin is
+> bumped, `5aed3834` is the newest verified-safe target; the checklist below
+> uses it.
 
 **1 — open.** Still exactly one tag (`eng/go/v0.0.1`, the kernel sub-module,
 not the CLI), and all four `replace` directives remain in `cmd/go/go.mod`,
@@ -158,10 +172,10 @@ libraries actually use.
 miniature): set the new ref in every lockstep location, then re-run the
 suites —
 
-1. `.github/workflows/test.yml` → `AQL_REF: 7193a7d3c69857207e44b4bd53541b9b0d4348aa`
+1. `.github/workflows/test.yml` → `AQL_REF: 5aed3834d9cc1bd4fd1ea5ad5b5ef37f9c973574`
    (the single source of truth the consistency job checks the rest against),
 2. `.claude/hooks/session-start.sh` → the same 40-char `AQL_REF`,
-3. `api.json` → `"aql_ref": "7193a7d3"`,
+3. `api.json` → `"aql_ref": "5aed3834"`,
 4. the short-ref mentions in `README.md` ("pinned commit"), `CLAUDE.md`
    (`AQL_REF =`), and `docs/how-to.md` (the `git checkout` line).
 

@@ -115,7 +115,7 @@ test/decision_prop_test.aql    property-based tests — direct (Test.check-prop)
 test/decision_prop_spec.aql    property-based tests — declarative spec format
 test/decision_smoke_test.aql   end-to-end smoke run over every public word
 docs/                          Diátaxis documentation (above)
-dx-report.md                   developer-experience notes against aql @ 958c379b, re-reviewed at 7193a7d3
+dx-report.md                   developer-experience notes against aql @ 958c379b, re-reviewed at 5aed3834
 ```
 
 Test files follow a consistent naming convention: `_test.aql` for direct
