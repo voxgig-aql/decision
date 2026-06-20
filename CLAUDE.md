@@ -22,6 +22,12 @@ mistakes to avoid. Every example there is verified against the pinned
   `_spec` = declarative spec; `unit` = example-based, `prop` = property-based.
   Each assertion-bearing suite ends by asserting `Test.fail-count` is `0` and
   prints `all green`; the smoke suite carries no assertion (pass = no error).
+- `test/diverge.sh` is the interpreter-vs-bytecode equivalence gate: it runs the
+  bytecode-compilable suites under both the interpreter and `--force-compile` and
+  fails on any output divergence. The project's pinned `aql` predates the bytecode
+  compiler, so the script builds its own bytecode-capable `aql` (pinned to its own
+  `BYTECODE_AQL_REF`); see
+  [docs/how-to.md](docs/how-to.md#check-the-interpreter-and-the-bytecode-compiler-agree).
 - Known AQL-runtime gotchas observed with the pinned build are in
   `dx-report.md`. The pinned aql commit is single-sourced in `.github/workflows/test.yml`
   (`AQL_REF` = `958c379b`); a CI job fails if the hook or `api.json` drift from it.

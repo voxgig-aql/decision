@@ -416,3 +416,47 @@ so a failure makes `aql` exit non-zero — which is exactly what the
 [CI workflow](../.github/workflows/test.yml) checks on every push and
 pull request. The smoke suite carries no assertions; it passes by
 running clean (exit `0` with no error).
+
+## Check the interpreter and the bytecode compiler agree
+
+AQL has two execution engines: the default tree-walking **interpreter**
+(`aql script.aql`) and the experimental **bytecode compiler**
+(`aql --force-compile script.aql`), which lowers the program to a flat
+strict-stack form and runs it on the kernel VM. The same program must
+produce the same answer on both — anything else is a runtime bug.
+
+`test/diverge.sh` is the gate. It runs each bytecode-compilable suite
+under both engines and asserts the output is byte-identical:
+
+```bash
+bash test/diverge.sh
+# ok       test/decision_smoke_test.aql: interpreter == bytecode
+# ok       test/decision_unit_test.aql: interpreter == bytecode
+# no divergence: interpreter and bytecode agree on all 2 compilable suite(s)
+```
+
+`--force-compile` *aborts* with a refusal reason when a program isn't
+compilable (rather than silently falling back to the interpreter, which
+plain `--compile` does), so a clean run is proof the bytecode VM actually
+executed the whole program — including every `Decision` evaluator the
+suite exercises. The imperative `decision_unit_test.aql` covers the full
+public surface (`apply-op`, `eval-cond`, `eval-pred`, every `eval-table`
+hit policy, `eval-tree`, `decide`), so the gate drives the VM across all
+of it.
+
+The spec and property suites use `each` and other code-body words the
+current compiler still refuses, so they can't be force-compiled yet;
+they run under the interpreter only. As the compiler grows to accept
+them, add them to the `COMPILABLE` list in `test/diverge.sh`.
+
+The gate needs an `aql` that understands `--force-compile`. The project's
+pinned `AQL_REF` (`958c379b`) predates the bytecode compiler, so the
+script resolves a bytecode-capable `aql` itself: it uses the `BYTECODE_AQL`
+binary if you point the env var at one, otherwise the on-`PATH` `aql` if
+that already accepts the flag, and otherwise builds one from its own
+`BYTECODE_AQL_REF` (a recent `main` commit) into `~/.local/bin`, caching
+it. That keeps the divergence build separate from the library's pinned
+interpreter, which is unchanged. To wire the gate into CI, add a step that
+runs `bash test/diverge.sh` after the suites (it self-resolves the
+compiler build); note that editing `.github/workflows/` needs a token with
+`workflow` scope.

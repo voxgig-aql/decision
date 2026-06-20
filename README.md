@@ -114,6 +114,7 @@ test/decision_unit_spec.aql    example-based unit tests — declarative spec for
 test/decision_prop_test.aql    property-based tests — direct (Test.check-prop)
 test/decision_prop_spec.aql    property-based tests — declarative spec format
 test/decision_smoke_test.aql   end-to-end smoke run over every public word
+test/diverge.sh                interpreter-vs-bytecode equivalence gate (runs suites on both engines)
 docs/                          Diátaxis documentation (above)
 dx-report.md                   developer-experience notes against aql @ 958c379b, re-reviewed at 5aed3834
 ```
@@ -142,6 +143,14 @@ error. A GitHub Actions workflow
 ([`.github/workflows/test.yml`](.github/workflows/test.yml)) builds aql
 from the pinned commit (`AQL_REF`) and runs every suite on each push and
 pull request.
+
+AQL has two execution engines — the tree-walking interpreter and an
+experimental bytecode compiler — and the same program must agree on both.
+`bash test/diverge.sh` runs the bytecode-compilable suites under each
+engine and fails on any divergence. (The project's pinned `aql` predates
+the bytecode compiler, so the script builds its own bytecode-capable
+`aql`.) See
+[How-to → Check the interpreter and the bytecode compiler agree](docs/how-to.md#check-the-interpreter-and-the-bytecode-compiler-agree).
 
 ## License
 
