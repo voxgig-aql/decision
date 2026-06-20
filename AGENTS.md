@@ -2,7 +2,7 @@
 
 Guidance for an AI coding agent calling this decision-logic library from an
 AQL project. Every code block below is verified to run against
-`aql-lang/aql` @ `958c379b`. If you read nothing else, read
+`aql-lang/aql` @ `958c379b` (the pinned build) and @ `5aed3834` (latest `main`). If you read nothing else, read
 [The one calling rule](#the-one-calling-rule) and
 [Common mistakes](#common-mistakes).
 

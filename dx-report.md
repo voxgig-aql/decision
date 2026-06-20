@@ -1,10 +1,26 @@
 # Developer-experience report: porting `aql:decision` — notes for improving AQL
 
 **Date:** 2026-06-11
-**Builds under test:** `aql-lang/aql` @ `958c379b` (current `main`, what this
-library targets) and `db828ec` (the older ref the sibling bloom-filter/trie
+**Builds under test:** `aql-lang/aql` @ `958c379b` (the `main` this library
+originally targeted) and `db828ec` (the older ref the sibling bloom-filter/trie
 libraries pin). Every finding below was reproduced against the actual binaries;
 the commands and output are quoted verbatim.
+
+> **Re-reviewed 2026-06-11 against `main` @ `7193a7d3`, re-confirmed
+> 2026-06-18 against `main` @ `5aed3834`.** Upstream responded the same day
+> the report was filed (`1981f601`, *"fix: decision DX report"*): findings
+> **3, 4, 6, 8 are fixed**, **5 and 7** got their documentation halves (the
+> `check` lints remain open), **2 is partially fixed** (the hint never fires
+> for namespace-exposed words — this library's case), and **1 is unchanged**.
+> Every status held on the re-confirm (`5aed3834` is ~200 commits later —
+> bytecode-compiler, checker-accuracy, and vault work — none of it touches
+> this library). All five test suites pass unchanged and every idiom block is
+> byte-identical on both refs, so bumping the pin is verified safe — but the
+> bump itself needs a maintainer, because the workflow file holding the
+> canonical `AQL_REF` requires `workflow` scope to edit (see
+> [the bump checklist](#re-review-status-on-latest-main-7193a7d3)). Verified
+> evidence per finding:
+> [Re-review: status on latest main](#re-review-status-on-latest-main-7193a7d3).
 
 This report comes out of porting the interpreter's internal `aql:decision`
 module into a standalone pure-AQL library. The port itself went well — the
@@ -27,20 +43,147 @@ Each finding is tagged:
 
 ## Priority summary
 
-| # | Finding | Tag | Sev | One-line fix |
-|---|---------|-----|-----|--------------|
-| 1 | No installable `aql` release — everyone builds from source | tooling | **high** | Tagged releases + prebuilt binaries; unblock `go install` |
-| 2 | A swapped argument order has no "did you mean reordered?" hint — and can silently return a *wrong answer* | rough-by-design | **high** | On signature failure, try arg permutations and say so |
-| 3 | No first-class key-presence predicate (`has`), and no catch/recover word | language-bug | medium | Add a total `has`/`haskey` Boolean (the missing `get`/`getr` sibling) |
-| 4 | Errors raised across an import boundary lose their filename + source excerpt and leak a `CallAQL:` prefix | language-bug | medium | Render imported-file errors like entry-file errors |
-| 5 | `print` forward-collects, so sequential prints emit out of order — silently | rough-by-design | medium | Ship `puts`/`println` (= `print/s`); have `check` flag stranded operands |
-| 6 | `do/error` leaks the caught error on the stack (and `raise`'s own doc example is broken) | rough-by-design | medium | Bind the error as a normal arg; make the construct stack-neutral |
-| 7 | `eq` on maps/lists is identity-based — equal literals compare `false`, silently | rough-by-design | medium | `check`-time warning when both `eq` operands are Map/List (esp. a literal) |
-| 8 | `aql -version` reports `0.1.0-dev`, ignoring the embedded VCS revision; skew errors misdirect | tooling | medium | Read `debug.ReadBuildInfo` vcs.revision; better "needs newer aql" hint |
+| # | Finding | Tag | Sev | One-line fix | Status @ `7193a7d3` |
+|---|---------|-----|-----|--------------|---------------------|
+| 1 | No installable `aql` release — everyone builds from source | tooling | **high** | Tagged releases + prebuilt binaries; unblock `go install` | **open** |
+| 2 | A swapped argument order has no "did you mean reordered?" hint — and can silently return a *wrong answer* | rough-by-design | **high** | On signature failure, try arg permutations and say so | **partial** — fires for plain words, not namespaced ones |
+| 3 | No first-class key-presence predicate (`has`), and no catch/recover word | language-bug | medium | Add a total `has`/`haskey` Boolean (the missing `get`/`getr` sibling) | **fixed** — `has` shipped |
+| 4 | Errors raised across an import boundary lose their filename + source excerpt and leak a `CallAQL:` prefix | language-bug | medium | Render imported-file errors like entry-file errors | **fixed** |
+| 5 | `print` forward-collects, so sequential prints emit out of order — silently | rough-by-design | medium | Ship `puts`/`println` (= `print/s`); have `check` flag stranded operands | docs fixed; lint open |
+| 6 | `do/error` leaks the caught error on the stack (and `raise`'s own doc example is broken) | rough-by-design | medium | Bind the error as a normal arg; make the construct stack-neutral | **fixed** |
+| 7 | `eq` on maps/lists is identity-based — equal literals compare `false`, silently | rough-by-design | medium | `check`-time warning when both `eq` operands are Map/List (esp. a literal) | docs fixed; lint open |
+| 8 | `aql -version` reports `0.1.0-dev`, ignoring the embedded VCS revision; skew errors misdirect | tooling | medium | Read `debug.ReadBuildInfo` vcs.revision; better "needs newer aql" hint | **fixed** |
+
+---
+
+## Re-review: status on latest main (7193a7d3)
+
+Re-tested 2026-06-11 against `main` @ `7193a7d3` (39 commits past
+`958c379b`), which includes upstream's same-day response commit `1981f601`
+(*"fix: decision DX report — do/error stack-neutral, has word,
+import-boundary errors, swapped-arg hint, version stamp, doc fixes"*). All
+five of this library's test suites pass unchanged on `7193a7d3`, every
+AGENTS.md/skill code block re-verified, and `aql check --soft` behaves as
+before — so adopting it is safe. Per-finding status, each re-verified
+against the freshly built binary:
+
+> **Re-confirmed 2026-06-18 against `main` @ `5aed3834`** (the newest main,
+> ~200 commits past `7193a7d3` — mostly the bytecode-compiler effort, checker
+> accuracy, and vault TUI). Every per-finding status below is unchanged, all
+> five suites still pass, all idiom blocks emit identical output, and the
+> advisory `aql check --soft` noise even dropped (51→39 errors, from the
+> checker-accuracy work). The findings still open — **1** and the
+> namespaced-word half of **2** — are still open verbatim. If the pin is
+> bumped, `5aed3834` is the newest verified-safe target; the checklist below
+> uses it.
+
+**1 — open.** Still exactly one tag (`eng/go/v0.0.1`, the kernel sub-module,
+not the CLI), and all four `replace` directives remain in `cmd/go/go.mod`,
+so `go install …@latest` stays blocked and every consumer still bootstraps
+from a pinned clone — this review hand-built yet another one.
+
+**2 — partially fixed.** The proposed permutation probe exists and fires for
+plain words, in both the forward and the stack form:
+
+```
+$ aql -e 'def wp fn [[p:String t:Map] [Map] [t]] wp {a:1} "collect"'
+error: [aql/signature_error]: no matching signature for wp
+  = no signature matches (Map, ProperString); one exists for (String, Map)
+    — did you swap the arguments? expected: wp p:String t:Map
+```
+
+But it never fires for **namespace-exposed words** — and this library
+exports everything through `surface`/`exposes`. The report's original repro,
+`Decision.with-policy table "collect"`, still fails down the
+`uncalled_function` path with a swap-blind hint (*"check the call's argument
+types and arity — or use with-policy/r …"* — better than the old grouping
+hint, but it doesn't see the reorder). And the dangerous same-typed swap,
+`Decision.decide {age:30} table`, still returns the byte-identical
+`{ok:false error:"unknown-model-kind"}`, as predicted — no checker can catch
+Map/Map. Remaining ask: run the same permutation probe on the
+namespaced-dispatch failure path, where real library calls live.
+
+**3 — fixed.** `has` shipped with exactly the proposed semantics: a total
+Boolean presence test that distinguishes present-but-`None` from absent,
+mirrors `get`'s container table, never raises, and composes in conditions:
+
+```
+$ aql -e '{a:None} "a" has'                  # present, value None
+true
+$ aql -e '{a:1} "b" has'                     # absent
+false
+$ aql -e 'none "a" has'                      # None parent — total
+false
+$ aql -e '[{a:1} {b:2}] filter ["a" has]'    # composes
+[{a:1}]
+```
+
+(Relatedly, `getr`'s absence raise now carries the documented `not_found`
+code — `93ebcd40`.) This unblocks the library-side follow-up: the
+presence/optional-input conditions this module had to cut are now
+expressible.
+
+**4 — fixed.** The same missing-field repro now renders with the imported
+file's name, source excerpt, and caret — identical fidelity to entry-file
+errors — and the `CallAQL:` prefix is gone:
+
+```
+error: [aql/not_comparable]: gte
+  --> ./decision.aql:130:396
+  130 | def apply-op gen [(T extends Comparable)] fn [[rhs:T op:String lhs:T] …
+                                                            ^^^^^ gte
+```
+
+**5 — docs fixed; the `check` lint remains open.** Behaviour is unchanged by
+design (`"a" print "b" print` still emits `b` then `a`), but
+`describe print` now documents the ordering pitfall prominently and
+recommends `print/s` or statement terminators for sequences. The proposed
+`check` advisory for stranded-then-flushed values is still future work.
+
+**6 — fixed.** `do [ raise "boom" ] error [ "recovered" ]` now leaves
+exactly `recovered` — nothing leaks to stdout, and the
+`def result do […] error […]` form binds the handler's result, not the
+caught error. The broken `dup.got` example in `describe raise` was replaced
+with the working `var [[e] …]` form.
+
+**7 — docs fixed; the `check` lint remains open.** Identity semantics are
+intentionally kept, but `describe eq`'s notes now lead with
+`` `{a:1} eq {a:1}` is `false` `` and close with "in tests, assert maps/lists
+with `deq`, not `eq`". The proposed `check`-time warning for Map/List `eq`
+operands is still future work.
+
+**8 — fixed.** Dev builds now read the embedded VCS stamp:
+
+```
+$ aql -version
+aql 0.1.0-dev (git 7193a7d3c698, dirty)
+```
+
+**Net:** four findings fully fixed (3, 4, 6, 8), two shipped their
+documentation halves with the `check` lints still open (5, 7), one is
+partially fixed with a concrete remaining gap (2 — the probe skips
+namespace-exposed words), and the release-engineering finding is untouched
+(1). The two `high`-severity items are, fittingly, the two still open:
+installable releases, and swap diagnostics on the dispatch path real
+libraries actually use.
+
+**To adopt the pin** (verified safe; needs a maintainer because
+`.github/workflows/test.yml` requires `workflow` scope — finding 1 in
+miniature): set the new ref in every lockstep location, then re-run the
+suites —
+
+1. `.github/workflows/test.yml` → `AQL_REF: 5aed3834d9cc1bd4fd1ea5ad5b5ef37f9c973574`
+   (the single source of truth the consistency job checks the rest against),
+2. `.claude/hooks/session-start.sh` → the same 40-char `AQL_REF`,
+3. `api.json` → `"aql_ref": "5aed3834"`,
+4. the short-ref mentions in `README.md` ("pinned commit"), `CLAUDE.md`
+   (`AQL_REF =`), and `docs/how-to.md` (the `git checkout` line).
 
 ---
 
 ## 1. No installable `aql` release — every consumer builds from source · *tooling · high*
+
+> **Re-review @ `7193a7d3`: still open.** See [the re-review](#re-review-status-on-latest-main-7193a7d3); the section below is the original finding, kept as the record.
 
 A downstream pure-AQL library needs a *specific* `aql` binary to run and test
 its module (this one requires `958c379b`). There is no tagged release, no
@@ -76,6 +219,8 @@ tags for the CLI module so `@latest` resolves.
 ---
 
 ## 2. A swapped argument order has no diagnostic — and can silently return a wrong answer · *rough-by-design · high*
+
+> **Re-review @ `7193a7d3`: partially fixed — the hint fires for plain words but not namespace-exposed ones.** See [the re-review](#re-review-status-on-latest-main-7193a7d3); the section below is the original finding, kept as the record.
 
 The receiver/model-first convention reads naturally but is easy to invert, and
 inverting it produces one of three unhelpful symptoms depending on the arg
@@ -116,6 +261,8 @@ dispatch can distinguish them.
 
 ## 3. No first-class key-presence predicate, and no catch/recover word · *language-bug · medium*
 
+> **Re-review @ `7193a7d3`: fixed — `has` shipped.** See [the re-review](#re-review-status-on-latest-main-7193a7d3); the section below is the original finding, kept as the record.
+
 A decision condition wants to ask "is this field present?" (DMN-style optional
 inputs). It can't be expressed, because there is no way to distinguish *absent*
 from *present-but-`None`*, and no Boolean presence test:
@@ -148,6 +295,8 @@ raise to a value.)
 ---
 
 ## 4. Errors across an import boundary lose their location · *language-bug · medium*
+
+> **Re-review @ `7193a7d3`: fixed.** See [the re-review](#re-review-status-on-latest-main-7193a7d3); the section below is the original finding, kept as the record.
 
 An error raised inside an *imported* file renders far worse than the same error
 in the entry file. Evaluating a condition against an input missing the queried
@@ -186,6 +335,8 @@ field/operands — but the location-rendering gap is the language's.)
 
 ## 5. `print` forward-collects, so sequential prints emit out of order — silently · *rough-by-design · medium*
 
+> **Re-review @ `7193a7d3`: docs fixed; `check` lint still open.** See [the re-review](#re-review-status-on-latest-main-7193a7d3); the section below is the original finding, kept as the record.
+
 `print` looks ahead for its argument, so each `print` grabs the *next*
 statement's value and the leftovers flush at program end:
 
@@ -223,6 +374,8 @@ value at a statement boundary that is later flushed unconsumed.
 
 ## 6. `do/error` leaks the caught error on the stack · *rough-by-design · medium*
 
+> **Re-review @ `7193a7d3`: fixed.** See [the re-review](#re-review-status-on-latest-main-7193a7d3); the section below is the original finding, kept as the record.
+
 The natural recovering wrapper `do [ …risky… ] error [ fallback ]` silently
 leaves the caught error on the stack *beneath* the handler's result — so the
 next `def`/sig-match binds the wrong value, or the error auto-prints:
@@ -255,6 +408,8 @@ or remove the broken `dup.got` doc example.
 
 ## 7. `eq` on maps/lists is identity-based — equal literals compare `false` · *rough-by-design · medium*
 
+> **Re-review @ `7193a7d3`: docs fixed; `check` lint still open.** See [the re-review](#re-review-status-on-latest-main-7193a7d3); the section below is the original finding, kept as the record.
+
 Comparing two structurally-equal maps with `eq` is `false` — at top level,
 inside an fn body, and inside an `each`/`var` body alike (we initially suspected
 a scope-dependent flip; there is none — it's consistently `false`):
@@ -283,6 +438,8 @@ deep-equal helper so test authors stop re-inventing the per-field workaround.
 ---
 
 ## 8. `aql -version` hides the build commit; skew errors misdirect · *tooling · medium*
+
+> **Re-review @ `7193a7d3`: fixed.** See [the re-review](#re-review-status-on-latest-main-7193a7d3); the section below is the original finding, kept as the record.
 
 A stale `aql` on PATH silently lacked newer words, and `-version` couldn't
 disambiguate the build — everything not `make publish`'d reads `0.1.0-dev`, even
@@ -328,7 +485,8 @@ AQL problems — recorded so they aren't mistaken for language bugs:
 - **Unary ops (`is_null`/`is_not_null`) are unreachable through `eval-cond`** —
   `eval-cond` always supplies a `value`, so a unary op there raises. This is
   downstream of the missing `has` predicate (finding 3); the module simply can't
-  express a presence condition.
+  express a presence condition. *(Update: `has` shipped in `7193a7d3`, so this
+  is now a library to-do rather than a language blocker.)*
 - **`make-rule` requires a `Map` `then`** while `make-leaf` accepts any result —
   a builder being stricter than its generic type, a module choice.
 - **A "miss" is a value** (`{ok:false error:"…"}`), not a throw — a good pattern,
