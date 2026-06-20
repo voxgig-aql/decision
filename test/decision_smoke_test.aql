@@ -6,50 +6,56 @@
 # Run:
 #   aql test/decision_smoke_test.aql
 #
-# Note: every line uses the `(value) print end` form — one value per
-# statement — so the narrated output stays in source order (a bare
-# leading `print …` collects forward and can reorder).
+# Style: every narrated line uses the forward `print (value)` form — the
+# verb first, its one argument grouped in parens immediately after. Because
+# that argument sits directly ahead of `print`, nothing reaches across a
+# statement boundary, so NO `end`/`;` terminators are needed and the output
+# still flushes in source order. (The stack form `(value) print` would need
+# a terminator: `print` is forward-precedent, so without one it looks past
+# the value behind it into the next statement and reverses the pair. The
+# parens around each call are still required — `print Decision.foo a b`
+# would print the *word* `foo` and strand `a b`; a `;` does not fix that.)
 
-import "./decision.aql" end
+import "./decision.aql"
 
-("--- decision smoke demo ---") print end
+print "--- decision smoke demo ---"
 
 # --- primitive operators (apply-op) --------------------------------
 # apply-op takes rhs op lhs and computes `lhs op rhs`.
-("apply-op 25 gte 18:  ") print end
-((Decision.apply-op 18 "gte" 25)) print end         # lhs 25 gte rhs 18 => true
-("apply-op 'a' lt 'b':  ") print end
-((Decision.apply-op "b" "lt" "a")) print end        # lhs 'a' lt rhs 'b' => true
-("apply-op 5 is_not_null:") print end
-((Decision.apply-op 5 "is_not_null")) print end     # unary => true
+print "apply-op 25 gte 18:  "
+print (Decision.apply-op 18 "gte" 25)         # lhs 25 gte rhs 18 => true
+print "apply-op 'a' lt 'b':  "
+print (Decision.apply-op "b" "lt" "a")        # lhs 'a' lt rhs 'b' => true
+print "apply-op 5 is_not_null:"
+print (Decision.apply-op 5 "is_not_null")     # unary => true
 
 # --- a single condition (cond / eval-cond) -------------------------
 def adult-cond (Decision.cond age/q "gte" 18)
-("cond record:          ") print end
-((adult-cond)) print end
-("eval-cond age 25:     ") print end
-((Decision.eval-cond adult-cond {age:25})) print end # => true
-("eval-cond age 15:     ") print end
-((Decision.eval-cond adult-cond {age:15})) print end # => false
+print "cond record:          "
+print adult-cond
+print "eval-cond age 25:     "
+print (Decision.eval-cond adult-cond {age:25}) # => true
+print "eval-cond age 15:     "
+print (Decision.eval-cond adult-cond {age:15}) # => false
 
 # --- compound predicates (all-of / any-of / not-of / eval-pred) ----
 def all-pred (Decision.all-of [
   {field:"age"   op:"gte" value:18}
   {field:"score" op:"gte" value:90}
 ])
-("eval-pred all-of:     ") print end
-((Decision.eval-pred all-pred {age:25 score:95})) print end   # => true
+print "eval-pred all-of:     "
+print (Decision.eval-pred all-pred {age:25 score:95})   # => true
 
 def any-pred (Decision.any-of [
   {field:"age"   op:"lt"  value:13}
   {field:"score" op:"gte" value:90}
 ])
-("eval-pred any-of:     ") print end
-((Decision.eval-pred any-pred {age:25 score:95})) print end   # => true (second child holds)
+print "eval-pred any-of:     "
+print (Decision.eval-pred any-pred {age:25 score:95})   # => true (second child holds)
 
 def not-pred (Decision.not-of {field:"age" op:"lt" value:18})
-("eval-pred not-of:     ") print end
-((Decision.eval-pred not-pred {age:25})) print end            # => true
+print "eval-pred not-of:     "
+print (Decision.eval-pred not-pred {age:25})            # => true
 
 # --- a decision table (make-rule / make-table / eval-table) --------
 def rules [
@@ -58,10 +64,10 @@ def rules [
   (Decision.make-rule {field:"age" op:"gte" value:18} {category:"adult"})
 ]
 def table (Decision.make-table rules)
-("eval-table age 12:    ") print end
-((Decision.eval-table table {age:12})) print end    # => {category: minor}
-("eval-table age 30:    ") print end
-((Decision.eval-table table {age:30})) print end    # => {category: adult}
+print "eval-table age 12:    "
+print (Decision.eval-table table {age:12})    # => {category: minor}
+print "eval-table age 30:    "
+print (Decision.eval-table table {age:30})    # => {category: adult}
 
 # --- hit policies (with-policy) ------------------------------------
 # collect returns a List of every matching rule's then.
@@ -70,8 +76,8 @@ def tag-rules [
   (Decision.make-rule {field:"score" op:"gte" value:50} {tag:"passing"})
 ]
 def collect-table (Decision.with-policy "collect" (Decision.make-table tag-rules))
-("with-policy collect:  ") print end
-((Decision.eval-table collect-table {age:25 score:80})) print end  # => [{tag: adult}, {tag: passing}]
+print "with-policy collect:  "
+print (Decision.eval-table collect-table {age:25 score:80})  # => [{tag: adult}, {tag: passing}]
 
 # --- a decision tree (make-branch / make-leaf / make-tree / eval-tree)
 def root-node (Decision.make-branch root/q [
@@ -81,22 +87,22 @@ def root-node (Decision.make-branch root/q [
 def minor-leaf (Decision.make-leaf minor/q "too-young")
 def adult-leaf (Decision.make-leaf adult/q "welcome")
 def tree (Decision.make-tree root/q [root-node minor-leaf adult-leaf])
-("eval-tree age 40:     ") print end
-((Decision.eval-tree tree {age:40})) print end      # => welcome
-("eval-tree age 10:     ") print end
-((Decision.eval-tree tree {age:10})) print end      # => too-young
+print "eval-tree age 40:     "
+print (Decision.eval-tree tree {age:40})      # => welcome
+print "eval-tree age 10:     "
+print (Decision.eval-tree tree {age:10})      # => too-young
 
 # --- decide: dispatch on model kind --------------------------------
 def senior-table (Decision.make-table rules)
-("decide table age 70:  ") print end
-((Decision.decide senior-table {age:70})) print end # => {category: senior}
-("decide tree age 40:   ") print end
-((Decision.decide tree {age:40})) print end          # => welcome
+print "decide table age 70:  "
+print (Decision.decide senior-table {age:70}) # => {category: senior}
+print "decide tree age 40:   "
+print (Decision.decide tree {age:40})         # => welcome
 def slim-table (Decision.make-table [
   (Decision.make-rule {field:"age" op:"lt"  value:18} {category:"minor"})
   (Decision.make-rule {field:"age" op:"gte" value:65} {category:"senior"})
 ])
-("decide no-match age 30:") print end
-((Decision.decide slim-table {age:30})) print end    # => {ok: false, error: no-match}
+print "decide no-match age 30:"
+print (Decision.decide slim-table {age:30})   # => {ok: false, error: no-match}
 
-("--- decision smoke demo complete ---") print end
+print "--- decision smoke demo complete ---"
