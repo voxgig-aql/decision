@@ -2,144 +2,134 @@
 
 **Date:** 2026-06-24 (latest re-test)
 **Task:** track latest `aql` `main` and verify that **interpreting**, **checking**,
-and **compiling** all work fully against the `Decision` suites; review the
-upstream design docs that bear on the open gaps.
+and **compiling** work against the `Decision` suites; review the upstream design
+docs that bear on the open gaps.
 
 ## TL;DR
 
-Latest `main` is **`14036b41`** (built this pass).
+Latest `main` is **`407fedad`** (built this pass). **Checking is now fully
+clean** — the big change since the last pass.
 
-| Mode | `14036b41` (latest main) | Verdict |
+| Mode | `407fedad` (latest main) | Verdict |
 |------|--------------------------|---------|
 | **Interpreting** (`aql suite.aql`) | all 5 suites pass | ✅ **fully works** |
-| **Checking** (`aql check suite.aql`) | unit/spec/prop suites **0 errors**; `smoke_test` 16; `decision.aql` advisory **2** (was 41) | ⚠️ **nearly clean** |
-| **Compiling** (`aql --force-compile suite.aql`) | only `prop_test` compiles (== interp); `test-test`/`each` still refused | ❌ **partial / in flux** |
+| **Checking** (`aql check suite.aql`) | all 5 suites **0 errors**; `decision.aql` itself **0 errors** | ✅ **clean** |
+| **`--compile` == interpreter** | byte-identical on all 5 suites | ✅ **no divergence** |
+| **`--force-compile`** (strict, no fallback) | only `prop_test` compiles; the rest refuse on code-body words | ⚠️ **partial, deferred upstream** |
 
-Upstream **read this report** and landed fixes (see design review). The check
-story is now strong — the unit/spec/prop suites are clean and `decision.aql` is
-down to two residual false positives. Compiling the test-framework code-body
-words (`test-test`, `each`) remains the tracked §6 blocker. The gate
-(`test/diverge.sh`) **tracks the latest `main`** rather than pinning a build:
-its hard invariants — the interpreter passes every suite, and every suite the
-compiler accepts matches the interpreter — both hold on `14036b41` (only
-`prop_test` compiles today, and it matches). No library files changed.
+Upstream's checker-precision work landed: the namespace / dynamic-dispatch
+false positives that gave `decision_smoke_test` 16 errors and `decision.aql` 2
+are **gone** (independently re-verified upstream in
+[`CLIENT-VERIFICATION-MAIN-2026-06-24.md`](https://github.com/aql-lang/aql/blob/main/design/CLIENT-VERIFICATION-MAIN-2026-06-24.md)).
+The gate (`test/diverge.sh`) tracks `main` HEAD and now treats **`check` as a
+hard invariant** (it was advisory status while false positives remained). No
+library source change is needed.
 
 ## Builds tracked
 
 | Role | Commit | Notes |
 |------|--------|-------|
-| Project pinned interpreter (`AQL_REF`) | `958c379b` | the library's interpreter baseline; unchanged |
-| earlier main | `c44d994f`, `f8ee6426`, `65410b18` | prior passes (see trend) |
-| **Latest main (this pass)** | `14036b41` | what the gate tracks; includes the client-issue fixes below |
+| Project pinned interpreter (`AQL_REF`) | `958c379b` | the library's interpreter baseline; bump is optional, see below |
+| earlier main | `c44d994f`, `f8ee6426`, `65410b18`, `14036b41` | prior passes (see trend) |
+| **Latest main (this pass)** | `407fedad` | what the gate tracks; checker now fully clean |
 
 ### How it was obtained
 
-The proxy's scoped **git relay 403s for `aql-lang/aql`** (not in this session's
-git scope). A direct HTTPS **tarball** over the general proxy works:
+The proxy's scoped **git relay 403s for `aql-lang/aql`**. A direct HTTPS
+**tarball** over the general proxy works:
 
 ```bash
-curl -sSL -o aql-main.tar.gz https://codeload.github.com/aql-lang/aql/tar.gz/refs/heads/main   # HTTP 200
-curl -sS https://api.github.com/repos/aql-lang/aql/commits/main   # HEAD -> 14036b41…
-tar xzf aql-main.tar.gz && ( cd aql-*/cmd/go && GOFLAGS=-mod=mod \
-  go build -ldflags "-X github.com/aql-lang/aql/cmd/go.Version=14036b41…" -o ~/.local/bin/aql-main ./aql )
+REF=$(curl -sS https://api.github.com/repos/aql-lang/aql/commits/main | sed -nE 's/.*"sha": *"([0-9a-f]+)".*/\1/p' | head -1)
+curl -fsSL "https://codeload.github.com/aql-lang/aql/tar.gz/$REF" | tar -xz -C /tmp/aql --strip-components=1
+( cd /tmp/aql/cmd/go && GOFLAGS=-mod=mod go build -o ~/.local/bin/aql-main ./aql )
 ```
 
-## Per-suite results on latest main (`14036b41`)
+## Per-suite results on latest main (`407fedad`)
 
-| Suite | interpret | check | compile (`--force-compile`) |
-|-------|-----------|-------|------------------------------|
-| `decision_unit_test.aql`  | ✅ pass | ✅ 0 err | ❌ `code-body word test-test (Stage 2)` |
-| `decision_unit_spec.aql`  | ✅ pass | ✅ 0 err | ❌ `code-body word each (Stage 2)` |
-| `decision_prop_test.aql`  | ✅ pass | ✅ 0 err | ✅ **compiles, output == interpreter** |
-| `decision_prop_spec.aql`  | ✅ pass | ✅ 0 err | ❌ `code-body word each (Stage 2)` |
-| `decision_smoke_test.aql` | ✅ pass | ❌ 16 err | ❌ `check diagnostics` |
-
-Plain `--compile` (silent interpreter fallback) passes all 5 suites.
+| Suite | interpret | check | `--compile` == interp | `--force-compile` |
+|-------|-----------|-------|-----------------------|-------------------|
+| `decision_unit_test.aql`  | ✅ | ✅ 0 | ✅ | ❌ `code-body word test-test (Stage 2)` |
+| `decision_unit_spec.aql`  | ✅ | ✅ 0 | ✅ | ❌ `code-body word each (Stage 2)` |
+| `decision_prop_test.aql`  | ✅ | ✅ 0 | ✅ | ✅ **compiles (output == interpreter)** |
+| `decision_prop_spec.aql`  | ✅ | ✅ 0 | ✅ | ❌ `code-body word each (Stage 2)` |
+| `decision_smoke_test.aql` | ✅ | ✅ 0 | ✅ | ❌ `check diagnostics` (dynamic-help artifact, not a real check error) |
 
 ## Design-doc review (latest `main/design`)
 
-- **`CLIENT-FIXES-2026-06-24.md`** — upstream's response to the three client
-  reports, **this one included** (it links `aql-main-verification-2026-06-23.md`).
-  Landed fixes relevant to `decision`:
-  - `f247557` **`convert` return-type modeling** — `convert Float x` now yields a
-    *value* of the target type, not the bare type literal (killed the
-    `no_signature` on downstream arithmetic).
-  - `a0604d7` **`fold [push]`** — `push`'s `[Any List]` overload now declares a
-    return, so a fold accumulator no longer widens to `Any` and fails
-    (`no_signature: push` gone).
-  - **gradual-`Any`** — an explicitly-`Any` param/return now binds a *dynamic*
-    carrier and poly-matches concrete slots (the "unify `Any` with concrete
-    params" item). This cleared the bulk of the `decision.aql` check noise.
+- **`CLIENT-VERIFICATION-MAIN-2026-06-24.md`** (the doc that prompted this pass) —
+  upstream's independent re-verification of all three client libraries against
+  `main @ 0b010ae`, **this report cited as a driver**. For `decision`: every
+  suite interprets, **checks 0 errors** (smoke was 16), and `--compile` matches
+  the interpreter; `decision.aql` direct check is **0 errors** (was 2). Confirms
+  the only remaining gap is strict `--force-compile` of the code-body words.
+- **`CLIENT-FIXES-2026-06-24.md`** — the fixes behind the cleanup: `convert`
+  return-type modeling, `fold [push]` return decl, and **gradual-`Any`** carriers
+  (an explicitly-`Any` param/return poly-matches concrete slots).
+- **`module-fn-checkstate-ownership.{5,6}.md`** — diagnoses the `smoke`
+  `--force-compile` `check diagnostics` refusal: it is **not** a real check error
+  (smoke checks 0) but the compile path's internal **dynamic-help example
+  generator** running fn bodies against synthetic `{a:1,b:2}` args. The sound fix
+  (hermetic help eval + first-class construction-check + corpus re-baseline) is a
+  scoped upstream project; partial fixes regressed the calibrated corpus.
+- **`aql-bytecode-completion.0.md` / `COMPILABLE-SUBSET.md`** — `test-test` /
+  `each` (code-body words) are the named Stage-2 emitter cluster; "refusal is
+  always sound" (a refusal never miscompiles).
 
-  Its decision verdict: unit/spec/prop **check clean**; smoke's 16 are the
-  deferred **namespace + dynamic-dispatch** class (`DTable`,
-  `eval-table`/`decide` left as `uncalled_function`). Its compile note: the
-  remaining `--force-compile` refusals are the test framework's **code-body
-  words** (`each`, `test-test`, `do` at "Stage 2"), the tracked §6 emitter work,
-  unchanged by the branch.
-- **`aql-bytecode-finish-line.0.md` / `aql-bytecode-final-two-refusals.0.md`** —
-  the *spec-corpus* `refusalCeiling` has reached **0**, but that corpus's "Test
-  harness" tier (`test-test`/`test-prop`/`test-check-prop`/`test-skip`, ~16 rows)
-  is handled by **meta-fallback** (`TestOnlyMetaFallsBack`), i.e. it falls back
-  to the interpreter rather than truly lowering — which is exactly why
-  `--force-compile` (no fallback) still refuses our `test-test`/`each` suites.
-- **`COMPILABLE-SUBSET.md` / `aql-bytecode-completion.0.md`** — confirm `each`
-  with code-body/lambda args and the test-harness words are the named
-  reducible/META clusters still being lowered; "refusal is always sound" (a
-  refusal never miscompiles).
-- **`checker-accuracy-review.10.md`** — the gradual-`Any` / disjunct-matching
-  work behind the `decision.aql` 41 → 2 drop; the residual `all`/`any` and the
-  smoke namespace cases are the known not-yet-threaded exports.
+## Trend across the builds tested (check error counts)
 
-## Trend across the builds tested
-
-| Metric | `c44d994f` | `f8ee6426` | `65410b18` | `14036b41` |
-|--------|-----------:|-----------:|-----------:|-----------:|
-| interpret (all suites) | ✅ | ✅ | ✅ | ✅ |
-| unit/spec/prop check | 0 | 0 | 0 | 0 |
-| `smoke_test` check | 0\* | 16 | 16 | 16 |
-| `decision.aql` advisory check | 39 | 41 | 5 | **2** |
-| suites that `--force-compile` | unit_test, smoke | — | — | **prop_test** |
+| Metric | `c44d994f` | `f8ee6426` | `65410b18` | `14036b41` | `407fedad` |
+|--------|-----------:|-----------:|-----------:|-----------:|-----------:|
+| interpret (all suites) | ✅ | ✅ | ✅ | ✅ | ✅ |
+| unit/spec/prop check | 0 | 0 | 0 | 0 | **0** |
+| `smoke_test` check | 0\* | 16 | 16 | 16 | **0** |
+| `decision.aql` direct check | 39 | 41 | 5 | 2 | **0** |
+| suites that `--force-compile` | unit_test, smoke | — | — | prop_test | prop_test |
 
 \* `c44d994f` predates the "module-fn bodies analyse in check mode" change, so
-its checker never descended into the imported `decision.aql` word bodies — hence
-0 on smoke there. The 16 are false positives regardless (the interpreter runs
-smoke green).
+its checker never descended into the imported word bodies. Checking is now
+genuinely clean from the source, not by avoidance.
 
-## Residual diagnostics (all false positives — interpreter runs green)
+## The one remaining gap: `--force-compile`
 
-- `decision.aql` (2): `no_signature` for the internal generics `all` / `any`.
-- `smoke_test` (16): `uncalled_function: eval-table/eval-tree/decide/with-policy
-  … left on the stack as data`, `undefined_word: DTable`,
-  `no_signature: make/collect-table/all/any` — the namespace-exposed-word class
-  the checker does not yet thread.
-- Compile: `test-test` and `each` are the test framework's code-body words
-  (tracked §6); `smoke` additionally gates on the above check diagnostics.
+Strict bytecode (no fallback) still refuses a handful of **code-body words** —
+`test-test` and `each` (the Stage-2 emitter cluster) and, for `smoke`, the
+dynamic-help `check diagnostics` artifact. These are **sound refusals** (never a
+miscompile) and **deferred upstream by design**. `--compile` (silent interpreter
+fallback) produces correct output for every suite, and the compile==interpreter
+invariant holds everywhere — so this is a coverage gap, not a correctness bug.
+As upstream lowers these, the gate's auto-detected compilable subset grows with
+no edit needed.
 
 ## Recommendation
 
-We are on an iterative-improvement track, so the gate **tracks the latest
-`main`** rather than holding a "best" pin — `test/diverge.sh` builds the current
-`main` HEAD by default and auto-detects what compiles.
+We track the latest `main`; `test/diverge.sh` builds `main` HEAD by default and
+auto-detects what compiles.
 
-- **The hard invariants hold on `14036b41`:** the interpreter passes every suite,
-  and the one suite the compiler accepts (`prop_test`) matches the interpreter
-  byte-for-byte. As more suites start compiling upstream, they are
-  divergence-checked automatically — no edit to the gate needed.
-- **Checking is essentially solved** for the unit/spec/prop suites (0 errors) and
-  `decision.aql` is down to two false positives (`all`/`any`). The `smoke`
-  residue (16) is the deferred namespace / dynamic-dispatch class.
-- **Compiling** the test-framework code-body words (`test-test`, `each`) is the
-  remaining §6 work; until it lands, those suites report `compile n/a` and run
-  under interpreter + check only.
-- The project's pinned interpreter (`AQL_REF = 958c379b`) is the library's
-  baseline and is independent of whatever build the gate tracks.
+- **`check` is now a hard gate.** All five suites and `decision.aql` check 0
+  errors on latest, so the gate fails on any check regression (it was advisory
+  status while false positives remained). Interpreter-green and
+  no-divergence-on-compiled remain the other two hard invariants. Gate
+  re-verified **green** on `407fedad`.
+- **CI follow-ups (need a `workflow`-scope token — currently blocked here).**
+  The `.github/workflows/test.yml` "Static check (advisory, non-gating)" step
+  runs `aql check --soft decision.aql` with `continue-on-error: true` against the
+  pinned `AQL_REF = 958c379b`, where `decision.aql` still shows its old
+  diagnostics. To promote it to a real gate, a maintainer should **(a)** bump
+  `AQL_REF` to a clean build (`0b010ae` or newer) across the workflow, the
+  session-start hook, and `api.json`, then **(b)** drop `--soft` and
+  `continue-on-error` (optionally looping the check over `test/*.aql`). Both
+  touch `.github/workflows/`, which this session's token cannot push.
+- **`--force-compile` stays advisory** until the upstream code-body / dynamic-help
+  work lands.
+- The library still only *requires* `aql ≥ 958c379b`; bumping the baseline pin is
+  safe but optional.
 
 ## Reproduce (per mode)
 
 ```bash
 aql-main test/decision_unit_test.aql                  # interpret
-aql-main check test/decision_unit_test.aql            # check (non-zero exit on errors)
-aql-main --force-compile test/decision_prop_test.aql  # compile (aborts if uncompilable)
-BYTECODE_AQL=~/.local/bin/aql-main bash test/diverge.sh   # whole gate against a given build
+aql-main check test/decision_unit_test.aql            # check — 0 errors
+aql-main --compile test/decision_unit_test.aql        # output matches interpreter
+aql-main --force-compile test/decision_prop_test.aql  # strict bytecode (aborts if uncompilable)
+bash test/diverge.sh                                  # whole gate, tracking main HEAD
 ```

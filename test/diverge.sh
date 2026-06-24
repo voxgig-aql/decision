@@ -11,18 +11,20 @@
 #                    (compiles to the kernel VM; ABORTS if it can't lower the
 #                    program faithfully — never a silent fallback)
 #
-# Two invariants are HARD (a violation fails the gate):
+# Three invariants are HARD (a violation fails the gate):
 #   1. the interpreter passes every suite;
-#   2. every suite the bytecode compiler ACCEPTS produces output byte-identical
+#   2. the checker (`aql check`) reports zero errors on every suite;
+#   3. every suite the bytecode compiler ACCEPTS produces output byte-identical
 #      to the interpreter — i.e. the two engines never diverge.
 #
-# Everything else is reported as CURRENT STATUS, because it moves as aql
-# improves and is outside this repo's control:
-#   - per-suite `check` error counts (the checker still can't trace some
-#     namespace-exposed / dynamically-dispatched words — false positives the
-#     interpreter runs green);
-#   - which suites the compiler accepts (the test-framework code-body words
-#     `test-test` / `each` are still being lowered upstream).
+# The checker reached zero false positives on this library as of aql `main`
+# `0b010ae` (design/CLIENT-VERIFICATION-MAIN-2026-06-24.md), so `check` is now a
+# real gate — a regression on a newer `main` is a signal worth failing on.
+#
+# Compile COVERAGE is the one thing reported as current STATUS, because it moves
+# as aql improves and is outside this repo's control: which suites the compiler
+# accepts (the test-framework code-body words `test-test` / `each` and the smoke
+# dynamic-help `check diagnostics` artifact are still being lowered upstream).
 # The compilable subset is auto-detected, so as more suites start compiling they
 # are divergence-checked automatically — no edit needed here.
 #
@@ -113,7 +115,7 @@ for suite in "${SUITES[@]}"; do
 
   chk_out="$("$AQL" check "$suite" 2>&1)"; chk_rc=$?
   cerr="$(printf '%s' "$chk_out" | grep -oE '[0-9]+ error\(s\)' | head -1)"; cerr="${cerr% error(s)}"; cerr="${cerr:-?}"
-  if [ "$chk_rc" -eq 0 ]; then notes+=("check ok"); checkclean=$((checkclean+1)); else notes+=("check ${cerr} err"); fi
+  if [ "$chk_rc" -eq 0 ]; then notes+=("check ok"); checkclean=$((checkclean+1)); else notes+=("check FAIL(${cerr} err)"); fail=1; fi
 
   byt_out="$("$AQL" --force-compile "$suite" 2>&1)"; byt_rc=$?
   if [ "$byt_rc" -eq 0 ]; then
@@ -128,6 +130,7 @@ for suite in "${SUITES[@]}"; do
   if printf '%s' "${notes[*]}" | grep -q "FAIL\|DIVERGES"; then
     red "$line"
     [ "$int_rc" -ne 0 ] && printf '%s\n' "$int_out" | sed 's/^/    interp| /'
+    [ "$chk_rc" -ne 0 ] && printf '%s\n' "$chk_out" | grep -iE "error\]" | sed 's/^/    check | /'
     if [ "$byt_rc" -eq 0 ] && [ "$byt_out" != "$int_out" ]; then
       diff <(printf '%s\n' "$int_out") <(printf '%s\n' "$byt_out") | sed 's/^/    diff  /'
     fi
@@ -139,7 +142,7 @@ done
 echo "---"
 dim "status: ${checkclean}/${#SUITES[@]} suites check-clean; ${compiled}/${#SUITES[@]} suites compile (divergence-checked); the rest are upstream-pending."
 if [ "$fail" -ne 0 ]; then
-  red "FAILED: the interpreter errored, or a compiled suite diverged from it"
+  red "FAILED: an interpreter or check error, or a compiled suite diverged from the interpreter"
   exit 1
 fi
-green "OK: interpreter passes every suite; no interpreter/bytecode divergence on any compiled suite"
+green "OK: every suite interprets and checks clean; no interpreter/bytecode divergence on any compiled suite"

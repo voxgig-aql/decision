@@ -25,10 +25,11 @@ mistakes to avoid. Every example there is verified against the pinned
 - `test/diverge.sh` is the multi-mode test gate and **tracks the latest `aql`
   from `main`** (AQL is on an iterative-improvement track — no fixed "best" pin).
   It runs every suite under the interpreter, the checker (`aql check`), and the
-  bytecode compiler (`--force-compile`). Hard invariants: the interpreter passes
-  every suite, and every suite the compiler *accepts* matches the interpreter
-  byte-for-byte (no divergence). The compilable subset is auto-detected;
-  per-suite check counts and which suites compile are reported as current status.
+  bytecode compiler (`--force-compile`). Hard invariants: every suite interprets
+  and checks (zero errors) clean, and every suite the compiler *accepts* matches
+  the interpreter byte-for-byte (no divergence). Check became a hard gate once the
+  checker reached zero false positives on this library (aql main `0b010ae`). The
+  compilable subset is auto-detected; compile coverage is reported as current status.
   It builds the latest `main` HEAD by default (override with `BYTECODE_AQL` or
   `BYTECODE_AQL_REF`); the project's pinned `AQL_REF` is only the interpreter
   baseline. See
