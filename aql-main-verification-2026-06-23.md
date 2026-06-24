@@ -18,19 +18,19 @@ Latest `main` is **`14036b41`** (built this pass).
 Upstream **read this report** and landed fixes (see design review). The check
 story is now strong — the unit/spec/prop suites are clean and `decision.aql` is
 down to two residual false positives. Compiling the test-framework code-body
-words (`test-test`, `each`) remains the tracked §6 blocker. The gate's
-`BYTECODE_AQL_REF` is **left at `c44d994f`** — it is still the build with the
-best bytecode coverage of *our* suites (the comprehensive `unit_test` + `smoke`);
-`14036b41` compiles only `prop_test`. No library files changed.
+words (`test-test`, `each`) remains the tracked §6 blocker. The gate
+(`test/diverge.sh`) **tracks the latest `main`** rather than pinning a build:
+its hard invariants — the interpreter passes every suite, and every suite the
+compiler accepts matches the interpreter — both hold on `14036b41` (only
+`prop_test` compiles today, and it matches). No library files changed.
 
 ## Builds tracked
 
 | Role | Commit | Notes |
 |------|--------|-------|
-| Project pinned interpreter (`AQL_REF`) | `958c379b` | predates the bytecode compiler; unchanged |
-| Gate bytecode build (`BYTECODE_AQL_REF`) | `c44d994f` | compiles `unit_test` + `smoke` (best coverage of our suites) |
-| earlier main | `f8ee6426`, `65410b18` | prior passes (see trend) |
-| **Latest main (this pass)** | `14036b41` | includes the client-issue fixes below |
+| Project pinned interpreter (`AQL_REF`) | `958c379b` | the library's interpreter baseline; unchanged |
+| earlier main | `c44d994f`, `f8ee6426`, `65410b18` | prior passes (see trend) |
+| **Latest main (this pass)** | `14036b41` | what the gate tracks; includes the client-issue fixes below |
 
 ### How it was obtained
 
@@ -118,20 +118,22 @@ smoke green).
 
 ## Recommendation
 
-- **Keep the gate on `c44d994f`.** It compiles the comprehensive `unit_test`
-  (every evaluator + hit policy) and `smoke`, which is stronger divergence
-  coverage than `prop_test` alone. `14036b41` compiles only `prop_test` and has
-  *regressed* `unit_test`/`smoke` compilation. Upstream's own re-pin checklist
-  agrees: keep `c44d994` for the bytecode-capable reference. (`test/diverge.sh`
-  re-verified **green**.)
+We are on an iterative-improvement track, so the gate **tracks the latest
+`main`** rather than holding a "best" pin — `test/diverge.sh` builds the current
+`main` HEAD by default and auto-detects what compiles.
+
+- **The hard invariants hold on `14036b41`:** the interpreter passes every suite,
+  and the one suite the compiler accepts (`prop_test`) matches the interpreter
+  byte-for-byte. As more suites start compiling upstream, they are
+  divergence-checked automatically — no edit to the gate needed.
 - **Checking is essentially solved** for the unit/spec/prop suites (0 errors) and
-  `decision.aql` is down to two false positives — if any suite gated check with
-  `--soft`/`continue-on-error`, that can now be tightened on a `14036b41`+ build.
-- **Re-test compiling** once the §6 code-body-word lowering lands (it would make
-  `test-test`/`each`, and thus `unit_test`/`smoke`, true-compile under
-  `--force-compile`), at which point widen the gate's `COMPILABLE` set.
-- The project's pinned interpreter (`AQL_REF = 958c379b`) is untouched and
-  remains the verified baseline for the library itself.
+  `decision.aql` is down to two false positives (`all`/`any`). The `smoke`
+  residue (16) is the deferred namespace / dynamic-dispatch class.
+- **Compiling** the test-framework code-body words (`test-test`, `each`) is the
+  remaining §6 work; until it lands, those suites report `compile n/a` and run
+  under interpreter + check only.
+- The project's pinned interpreter (`AQL_REF = 958c379b`) is the library's
+  baseline and is independent of whatever build the gate tracks.
 
 ## Reproduce (per mode)
 

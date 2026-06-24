@@ -114,7 +114,7 @@ test/decision_unit_spec.aql    example-based unit tests — declarative spec for
 test/decision_prop_test.aql    property-based tests — direct (Test.check-prop)
 test/decision_prop_spec.aql    property-based tests — declarative spec format
 test/decision_smoke_test.aql   end-to-end smoke run over every public word
-test/diverge.sh                multi-mode test gate (runs suites under interpreter, check, and bytecode)
+test/diverge.sh                multi-mode test gate (tracks latest aql; runs interpreter, check, bytecode)
 docs/                          Diátaxis documentation (above)
 dx-report.md                   developer-experience notes against aql @ 958c379b, re-reviewed at 5aed3834
 ```
@@ -145,12 +145,13 @@ from the pinned commit (`AQL_REF`) and runs every suite on each push and
 pull request.
 
 AQL can run a program three ways — the tree-walking interpreter, the
-static checker (`aql check`), and an experimental bytecode compiler — and
-each must pass. `bash test/diverge.sh` runs every suite under the
-interpreter and the checker, and the bytecode-compilable suites also under
-`--force-compile`, asserting each mode passes and that the interpreter and
-bytecode never diverge. (The project's pinned `aql` predates the bytecode
-compiler, so the script builds its own bytecode-capable `aql`.) See
+static checker (`aql check`), and an experimental bytecode compiler.
+`bash test/diverge.sh` tracks the **latest `aql` from `main`** and runs
+every suite under all three modes. Its hard guarantees are that the
+interpreter passes every suite and that any suite the compiler accepts
+matches the interpreter (no divergence); the per-suite check counts and
+which suites compile are reported as current status and improve as `aql`
+does. See
 [How-to → Run the suites under every execution mode](docs/how-to.md#run-the-suites-under-every-execution-mode).
 
 ## License

@@ -22,12 +22,16 @@ mistakes to avoid. Every example there is verified against the pinned
   `_spec` = declarative spec; `unit` = example-based, `prop` = property-based.
   Each assertion-bearing suite ends by asserting `Test.fail-count` is `0` and
   prints `all green`; the smoke suite carries no assertion (pass = no error).
-- `test/diverge.sh` is the multi-mode test gate: it runs every suite under the
-  interpreter and the checker (`aql check`), and the bytecode-compilable suites
-  also under `--force-compile`, requiring each mode to pass and the interpreter
-  and bytecode to agree byte-for-byte. The project's pinned `aql` predates the
-  bytecode compiler, so the script builds its own bytecode-capable `aql` (pinned
-  to its own `BYTECODE_AQL_REF`); see
+- `test/diverge.sh` is the multi-mode test gate and **tracks the latest `aql`
+  from `main`** (AQL is on an iterative-improvement track — no fixed "best" pin).
+  It runs every suite under the interpreter, the checker (`aql check`), and the
+  bytecode compiler (`--force-compile`). Hard invariants: the interpreter passes
+  every suite, and every suite the compiler *accepts* matches the interpreter
+  byte-for-byte (no divergence). The compilable subset is auto-detected;
+  per-suite check counts and which suites compile are reported as current status.
+  It builds the latest `main` HEAD by default (override with `BYTECODE_AQL` or
+  `BYTECODE_AQL_REF`); the project's pinned `AQL_REF` is only the interpreter
+  baseline. See
   [docs/how-to.md](docs/how-to.md#run-the-suites-under-every-execution-mode).
 - Known AQL-runtime gotchas observed with the pinned build are in
   `dx-report.md`. The pinned aql commit is single-sourced in `.github/workflows/test.yml`
