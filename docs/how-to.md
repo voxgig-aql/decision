@@ -446,20 +446,27 @@ bash test/diverge.sh
 # OK: interpreter passes every suite; no interpreter/bytecode divergence on any compiled suite
 ```
 
-Two invariants are **hard** (a violation fails the gate):
+Three invariants are **hard** (a violation fails the gate):
 
 1. the interpreter passes every suite (the supported path);
-2. every suite the compiler **accepts** produces output byte-identical to
+2. the checker (`aql check`) reports zero errors on every suite;
+3. every suite the compiler **accepts** produces output byte-identical to
    the interpreter — the two engines never diverge.
 
-Everything else is **current status**, reported per suite because it moves
-as `aql` improves and is outside this repo's control: the per-suite
-`check` error counts (the checker still can't trace some namespace-exposed
-/ dynamically-dispatched words — false positives the interpreter runs
-green), and which suites the compiler accepts (the test-framework
-code-body words `test-test` / `each` are still being lowered upstream).
-The compilable subset is **auto-detected**, so as more suites start
-compiling they are divergence-checked automatically — no edit needed.
+The checker reached **zero false positives** on this library as of aql
+`main` `0b010ae` (every suite, and `decision.aql` itself, now check 0
+errors — see the upstream
+[`CLIENT-VERIFICATION-MAIN-2026-06-24.md`](https://github.com/aql-lang/aql/blob/main/design/CLIENT-VERIFICATION-MAIN-2026-06-24.md)),
+so `check` is now a real gate rather than advisory status — a regression
+on a newer `main` is a signal worth failing on.
+
+The one thing reported as **current status** is *compile coverage*,
+because it moves as `aql` improves and is outside this repo's control:
+which suites the compiler accepts (the test-framework code-body words
+`test-test` / `each`, and the `smoke` suite's dynamic-help
+`check diagnostics` artifact, are still being lowered upstream). The
+compilable subset is **auto-detected**, so as more suites start compiling
+they are divergence-checked automatically — no edit needed.
 
 Resolving the build (latest `main` by default): the gate uses
 `$BYTECODE_AQL` if you point it at a binary, otherwise it builds

@@ -147,11 +147,10 @@ pull request.
 AQL can run a program three ways — the tree-walking interpreter, the
 static checker (`aql check`), and an experimental bytecode compiler.
 `bash test/diverge.sh` tracks the **latest `aql` from `main`** and runs
-every suite under all three modes. Its hard guarantees are that the
-interpreter passes every suite and that any suite the compiler accepts
-matches the interpreter (no divergence); the per-suite check counts and
-which suites compile are reported as current status and improve as `aql`
-does. See
+every suite under all three modes. Its hard guarantees are that every
+suite interprets and checks (zero errors) clean, and that any suite the
+compiler accepts matches the interpreter (no divergence); compile coverage
+is reported as current status and grows as `aql` does. See
 [How-to → Run the suites under every execution mode](docs/how-to.md#run-the-suites-under-every-execution-mode).
 
 ## License
