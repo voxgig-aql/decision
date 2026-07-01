@@ -16,6 +16,12 @@ against an input `Map`. The public surface is the `Decision` namespace.
 This library needs **aql ≥ `958c379b`** — it uses `surface`/`exposes`,
 generics, `refine Record`, and `fnsig`. It imports no `aql:*` dependencies.
 
+> **Calling convention.** Forward args, receiver (the model/input) last:
+> `Decision.decide model input`. Piping the input in also works
+> (`input Decision.decide model`); putting the receiver **first** silently
+> misbinds — both are `Map`s, so nothing type-checks it and you get a
+> plausible-looking wrong result, not an error.
+
 ## Import
 
 ```aql
@@ -29,18 +35,38 @@ import "./decision.aql"
 ## The one calling rule
 
 AQL is not C/Python/JS. There is no `f(a, b)` and no `obj.method(a)`. The
-canonical form is **forward** — the verb first, then its arguments:
+canonical form is **forward** — the verb first, then its arguments, with the
+**receiver last**:
 
 ```
-Decision.verb arg1 arg2
+Decision.verb …args receiver
 ```
 
-Two ordering facts that matter here:
+Every public word takes the thing it operates on — the model/table/input, the
+**receiver** — as its **last** argument. Written forward, the receiver falls
+naturally at the end:
 
-- **Evaluators take the model first, the input second:**
-  `Decision.eval-table table input`, `Decision.decide model input`,
-  `Decision.eval-cond cond input`. (Equivalently, in stack form the model
-  sits on *top* of the input: `input table Decision.eval-table`.)
+- `Decision.decide model input` — `input` (the data being evaluated) is last.
+- `Decision.eval-table table input` / `Decision.eval-cond cond input` — input last.
+- `Decision.with-policy policy table` — `table` (the model being rewritten) is last.
+
+Because the receiver is the last parameter, a stack/piping form *also* binds
+(`{age:25} Decision.decide table` works), but with two `Map`s it reads
+backwards — prefer forward. What you must **not** do is put the receiver
+*first* in an all-forward call:
+
+```aql
+(Decision.decide table {age:25})    # ✓ model, then input (receiver) last => a result
+(Decision.decide {age:25} table)    # ✗ receiver first: binds model:={age:25}
+                                     #   => {ok:false error:"unknown-model-kind"}
+```
+
+That swap is **silent**. `model` and `input` are both `Map`, so nothing
+type-checks it, and — unlike a plain word — `aql check`'s `mixed_form_call`
+nudge does **not** fire on the namespaced `Decision.*` dispatch path. You just
+get a plausible-looking error Map (`unknown-model-kind`, or `no-match`) back,
+so getting the order right matters.
+
 - **Wrap a call in parens, or end it,** when a bare value would otherwise
   follow the verb and get swallowed: `(Decision.decide table {age:25})`.
 
@@ -163,7 +189,7 @@ Test one condition or one operator directly:
 
 | ✗ Don't write | ✓ Write | Why |
 |---------------|---------|-----|
-| `Decision.decide {age:25} table` | `Decision.decide table {age:25}` | The **model comes first**, the input second. |
+| `Decision.decide {age:25} table` | `Decision.decide table {age:25}` | Forward form is `verb …args receiver`: the **model first, the input (receiver) last**. Both are `Map`, so a swap isn't type-checked and no `mixed_form_call` nudge fires — it **silently** returns a plausible error Map. |
 | `decide table input` (unqualified) | `Decision.decide table input` | Words live under the `Decision` namespace after import. |
 | `Decision.eval-table rules input` | `Decision.eval-table table input` | Pass the **table** (`make-table rules`), not the raw rules list. |
 | `op: ">="` / `op: "ge"` | `op: "gte"` | Ops are `eq/neq/lt/lte/gt/gte` + the unary `is_*` set. |

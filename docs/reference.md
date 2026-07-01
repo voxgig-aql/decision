@@ -33,10 +33,12 @@ arguments: `Decision.verb arg1 arg2`. There is no `f(a, b)` and no
 
 Two ordering facts:
 
-- **Evaluators take the model first, the input second:**
+- **The receiver (model/input) comes last** — model first, input second:
   `Decision.eval-table table input`, `Decision.decide model input`,
-  `Decision.eval-cond cond input`. (In stack form the model sits on
-  *top* of the input: `input table Decision.eval-table`.)
+  `Decision.eval-cond cond input`. A piping form also binds
+  (`input Decision.decide model`), but putting the receiver **first**
+  silently misbinds — both are `Map`s, so nothing type-checks it and you
+  get a plausible-looking wrong result, not an error.
 - **`apply-op` reads as `lhs op rhs`** but is *written*
   `Decision.apply-op rhs op lhs` — the right operand first, then the
   op, then the left operand (it computes `lhs op rhs`).

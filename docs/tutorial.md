@@ -13,10 +13,12 @@ repository checked out.
 
 Follow along by typing the script into a file as we grow it. We will
 build it up in pieces and run it after each step. The one rule to keep in
-mind: AQL is forward — the verb comes first, then its arguments
-(`Decision.decide table input`), and the **model comes before the
-input**. Wrap each call in parens (or end it) so the next token isn't
-swallowed.
+mind: AQL is forward — the verb comes first, then its arguments, with the
+**receiver (the model/input) last**: `Decision.decide table input`. Get
+that order wrong (`Decision.decide input table`) and it misbinds
+*silently* — both are Maps, so you get a plausible-looking wrong result,
+not an error. Wrap each call in parens (or end it) so the next token
+isn't swallowed.
 
 ---
 

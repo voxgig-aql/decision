@@ -370,14 +370,17 @@ age 16 -> teen
 age 42 -> adult
 ```
 
-The canonical call form is forward — the verb first, then its arguments
-(`Decision.decide table input`). **Wrap a call in parens, or end it,**
-when a bare value would otherwise follow the verb and get swallowed:
-`(Decision.decide table {age:25})`. The evaluators take the **model
-first, the input second** — passing them the other way round is the most
-common mistake. `test/decision_smoke_test.aql` is a complete worked
-example you can copy from, and [AGENTS.md](../AGENTS.md) is the
-condensed calling guide.
+The canonical call form is forward — the verb first, then its arguments,
+with the **receiver (the model/input) last**: `Decision.decide table
+input`. **Wrap a call in parens, or end it,** when a bare value would
+otherwise follow the verb and get swallowed: `(Decision.decide table
+{age:25})`. Piping the input in also binds
+(`{age:25} Decision.decide table`), but putting the receiver **first**
+(`Decision.decide {age:25} table`) silently misbinds — both are `Map`s,
+so nothing type-checks it and you get a plausible-looking wrong result
+rather than an error. That swap is the most common mistake.
+`test/decision_smoke_test.aql` is a complete worked example you can copy
+from, and [AGENTS.md](../AGENTS.md) is the condensed calling guide.
 
 ---
 

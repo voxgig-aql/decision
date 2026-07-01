@@ -20,9 +20,13 @@ def table (Decision.make-table [
 (Decision.decide table {age:30}) print end   # => {ok:false error:no-match}
 ```
 
-The model comes **first**, the input second (`Decision.decide table
-input`), and a *non-match* returns `{ok:false error:"…"}` rather than
-throwing.
+> **Calling convention.** AQL is forward: the verb first, arguments
+> after, with the **receiver (the model/input) last** —
+> `Decision.decide model input`. Piping the input in also binds
+> (`input Decision.decide model`), but putting the receiver **first**
+> silently misbinds: both are `Map`s, so nothing type-checks it and you
+> get a plausible-looking wrong result rather than an error. A
+> *non-match* returns `{ok:false error:"…"}` rather than throwing.
 
 > **Calling this library from an AI coding agent?** Read
 > **[AGENTS.md](AGENTS.md)** first — the exact AQL calling convention,

@@ -1,6 +1,6 @@
 ---
 name: decision-aql
-description: Use when writing or editing AQL code that calls the Decision decision-logic library — Decision.cond / all-of / any-of / not-of / make-rule / make-table / with-policy / make-branch / make-leaf / make-tree / eval-cond / eval-pred / eval-table / eval-tree / decide / apply-op, or any file that does `import "./decision.aql"`. Provides the exact AQL calling convention (which is not C/Python/JS), the model-first evaluator arg order, the builders/evaluators/ops/hit-policies, verified copy-paste idioms (a table and a tree), and fixes for the mistakes agents most often make (foreign call syntax, swapped model/input order, the missing-field `not_comparable` raise).
+description: Use when writing or editing AQL code that calls the Decision decision-logic library — Decision.cond / all-of / any-of / not-of / make-rule / make-table / with-policy / make-branch / make-leaf / make-tree / eval-cond / eval-pred / eval-table / eval-tree / decide / apply-op, or any file that does `import "./decision.aql"`. Provides the exact AQL calling convention (which is not C/Python/JS) — forward form with the receiver (model/table/input) last — the builders/evaluators/ops/hit-policies, the eq-vs-deq / immutability / has / overflow by-design notes, verified copy-paste idioms (a table and a tree), and fixes for the mistakes agents most often make (foreign call syntax, the silent swapped model/input order, the missing-field `not_comparable` raise).
 ---
 
 # Calling the Decision decision-logic library (AQL)
@@ -25,16 +25,39 @@ import "./decision.aql"
 ## The one calling rule
 
 AQL has no `f(a, b)` and no `obj.method(a)`. The canonical form is **forward**
-— the verb first, then its arguments:
+— the verb first, then its arguments, with the **receiver last**:
 
 ```
-Decision.verb arg1 arg2
+Decision.verb …args receiver
 ```
 
-- **Evaluators take the MODEL first, the input second:**
-  `Decision.eval-table table input`, `Decision.decide model input`,
-  `Decision.eval-cond cond input`. (In stack form the model sits on *top*:
-  `input table Decision.eval-table`.)
+Every public word takes the thing it operates on — the model/table/input, the
+**receiver** — as its **last** argument. Written forward, the receiver falls
+naturally at the end:
+
+- `Decision.decide model input` — `input` (the data being evaluated) is last.
+- `Decision.eval-table table input` / `Decision.eval-cond cond input` — input last.
+- `Decision.with-policy policy table` — `table` (the model being rewritten) is last.
+
+**Use the forward form and keep the receiver last.** Because the receiver is
+the last parameter, a stack/piping form *also* binds
+(`{age:25} Decision.decide table` works), but with two `Map`s it reads
+backwards — prefer forward. What you must **not** do is put the receiver
+*first* in an all-forward call:
+
+```aql
+(Decision.decide table {age:25})    # ✓ model, then input (receiver) last => a result
+(Decision.decide {age:25} table)    # ✗ receiver first: binds model:={age:25}
+                                     #   => {ok:false error:"unknown-model-kind"}
+```
+
+That swap is **silent**. `model` and `input` are both `Map`, so nothing
+type-checks it, and — unlike a plain word — `aql check`'s `mixed_form_call`
+nudge does **not** fire on the namespaced `Decision.*` dispatch path. You just
+get a plausible-looking error Map (`unknown-model-kind`, or `no-match`) back,
+so getting the order right matters. (`eval-table` / `with-policy` are luckier:
+a swap there mismatches a type and raises, rather than returning a fake miss.)
+
 - **Wrap a call in parens, or end it,** when a bare value would otherwise
   follow the verb and get swallowed: `(Decision.decide table {age:25})`.
 
@@ -125,17 +148,33 @@ def tree {kind:"tree" root:"root" nodes:[
 (Decision.decide tree {age:40}) print   # => welcome
 ```
 
+## By-design notes (AQL)
+
+- **`eq` is identity; `deq` is structural.** `{a:1} {a:1} eq` → `false`; use
+  `deq` for structural equality of `Map`/`List` values
+  (`{a:1} {a:1} deq` → `true`). The condition ops `eq`/`neq` compare scalars,
+  so this rarely bites inside a table — but it does when you assert on a
+  `then`/leaf **result Map**.
+- **`has` tests key presence** — `{a:1} "a" has` → `true`,
+  `{a:1} "b" has` → `false`. Prefer it over a manual `field None neq` check
+  before an ordering compare on a maybe-missing field.
+- **Maps/Lists are immutable.** Builders return fresh values; there is no
+  in-place edit. If you genuinely need a mutable Map, wrap it with `flex`
+  (`def m (flex {a:1})` then `(m set "b" 2)` → `{a:1 b:2}`).
+- **Integer overflow is fail-loud, by design.** Integers are 63-bit; an
+  overflowing `add`/`mul` **raises** `integer_overflow` rather than wrapping.
+
 ## Common mistakes
 
 | ✗ Don't write | ✓ Write | Why |
 |---------------|---------|-----|
-| `Decision.decide {age:25} table` | `Decision.decide table {age:25}` | The **model comes first**, the input second. |
+| `Decision.decide {age:25} table` | `Decision.decide table {age:25}` | Forward form is `verb …args receiver`: the **model first, the input (receiver) last**. Both are `Map`, so a swap isn't type-checked and no `mixed_form_call` nudge fires — it **silently** returns a plausible error Map. |
 | `decide table input` (unqualified) | `Decision.decide table input` | Words live under the `Decision` namespace after import. |
 | `Decision.eval-table rules input` | `Decision.eval-table table input` | Pass the **table** (`make-table rules`), not the raw rules list. |
 | `op: ">="` / `op: "ge"` | `op: "gte"` | Condition ops are `eq/neq/lt/lte/gt/gte`; the unary `is_*` set works only via direct `apply-op`. |
 | compare a Map/List with `lt` | compare scalars (or `eq`/`neq` only) | Ordering ops need **Comparable** operands; else `apply-op` raises `not_comparable`. |
 | treat a miss as an exception | inspect `result.error` (a hit has none) | A *non-match* returns `{ok:false error:"…"}` (no throw); a hit is your bare `then`/leaf value. |
-| an ordering op (`lt`/`gte`/…) on a maybe-missing field | guarantee the field is present, or compare with `eq`/`neq` only | A missing field is `None`, not Comparable, so an ordering op **raises** `not_comparable`. (`is_*` can't gate this — not usable in conditions.) |
+| an ordering op (`lt`/`gte`/…) on a maybe-missing field | gate presence first (`{…} field has`), or compare with `eq`/`neq` only | A missing field is `None`, not Comparable, so an ordering op **raises** `not_comparable`. (`is_*` can't gate this — not usable in conditions.) |
 | `make-branch "root" …` | `make-branch root/q …` | The builder's `id` is an **Atom**; quote bare names with `/q`. |
 
 A note on `print` while debugging: `print` collects a forward argument, so a
