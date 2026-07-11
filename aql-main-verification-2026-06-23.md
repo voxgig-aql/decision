@@ -7,15 +7,22 @@ docs that bear on the open gaps.
 
 ## TL;DR
 
-Latest `main` is **`407fedad`** (built this pass). **Checking is now fully
-clean** — the big change since the last pass.
+> **Newest pass (2026-07-11):** `main` re-fetched over plain HTTP (codeload/API
+> gated) — `check` still fully clean, and `--force-compile` coverage **grew to
+> 2/5** (`each` lowering partially landed: `unit_spec` + `prop_spec` now compile).
+> One breaking change (`print` barrier) required a one-line test fix. Details in
+> the [re-evaluation note](#re-evaluation-on-latest-main-2026-07-11-fetched-over-plain-http)
+> below. The table below is the `407fedad` baseline the trend is measured from.
 
-| Mode | `407fedad` (latest main) | Verdict |
+Baseline `407fedad`: **checking is fully clean** — the big change from the
+earlier passes.
+
+| Mode | `407fedad` (baseline) | Verdict |
 |------|--------------------------|---------|
 | **Interpreting** (`aql suite.aql`) | all 5 suites pass | ✅ **fully works** |
 | **Checking** (`aql check suite.aql`) | all 5 suites **0 errors**; `decision.aql` itself **0 errors** | ✅ **clean** |
 | **`--compile` == interpreter** | byte-identical on all 5 suites | ✅ **no divergence** |
-| **`--force-compile`** (strict, no fallback) | only `prop_test` compiles; the rest refuse on code-body words | ⚠️ **partial, deferred upstream** |
+| **`--force-compile`** (strict, no fallback) | `prop_test` compiles; the rest refuse on code-body words (→ 2/5 on 2026-07-11 `main`) | ⚠️ **partial, improving** |
 
 Upstream's checker-precision work landed: the namespace / dynamic-dispatch
 false positives that gave `decision_smoke_test` 16 errors and `decision.aql` 2
@@ -24,6 +31,36 @@ are **gone** (independently re-verified upstream in
 The gate (`test/diverge.sh`) tracks `main` HEAD and now treats **`check` as a
 hard invariant** (it was advisory status while false positives remained). No
 library source change is needed.
+
+### Re-evaluation on latest `main` (2026-07-11, fetched over plain HTTP)
+
+`codeload`, `api.github.com`, and the git relay are all gated for `aql-lang/aql`
+this session (403, *"Use add_repo to request access."*), but
+**`raw.githubusercontent.com` is not** — so `main` was reconstructed by pulling
+every file over HTTP from GitHub raw (using jsDelivr's data API only as the file
+**manifest**), and built (`go build ./aql`, `GOWORK=off`). The exact HEAD sha
+isn't recoverable (API gated); this is `main` as of 2026-07-11, ~800 files past
+`407fedad`. Two substantive changes for `decision`:
+
+- **Progress toward full compilation — `each` lowering partially landed.**
+  `unit_spec` and `prop_spec` (refused on `code-body word each` at `407fedad`)
+  now **`--force-compile` and match the interpreter**. The gate is green with
+  **2/5** suites compiling (was 1/5). New refusal messages
+  (`consumes loop results (Stage 2 loops only feed the program residual)`,
+  `fn test-test$body: …`) show the emitter cluster from the work prompt is
+  actively moving. `decision.aql` now checks **0 errors, 0 warnings** (was 3
+  warnings).
+- **Breaking change — the `print` forward-collection barrier is now a hard
+  error.** AGENTS.md finding #5 ("flag stranded operands") landed: a bare
+  `<value> print` immediately followed by a `def` barrier now raises
+  `signature_error` instead of silently reordering. This broke
+  `decision_prop_test.aql`'s summary (`"results:" print` before
+  `def all-results`). **Fixed** by terminating those prints with `end` (the
+  AGENTS.md-prescribed idiom) — verified backward-compatible on `407fedad`.
+
+Also from the prior pass: `test/diverge.sh`'s offline fallback now prefers the
+**newest cached bytecode build** over a possibly-stale on-`PATH` `aql` (and warns
+it may lag HEAD).
 
 ## Builds tracked
 

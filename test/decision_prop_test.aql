@@ -109,8 +109,8 @@ end
 
 # --- summary -------------------------------------------------------
 
-"---" print
-"results:" print
+"---" print end
+"results:" print end
 def all-results (Test.results end)
 def _print-results (all-results each [
   var [[r]

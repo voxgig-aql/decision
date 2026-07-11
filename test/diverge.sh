@@ -85,9 +85,15 @@ resolve_aql() {
   local ref="$BYTECODE_AQL_REF"
   [ -z "$ref" ] && ref="$(latest_main_sha)"
   if [ -n "$ref" ]; then build_ref "$ref" && return 0; fi
-  # offline fallbacks
-  supports_force_compile aql && { command -v aql; return 0; }
-  newest_cached_bytecode_aql && return 0
+  # Offline fallback (couldn't reach main to resolve/build latest): prefer the
+  # NEWEST cached bytecode build — the best proxy for "latest" — over a possibly
+  # stale on-PATH `aql`. Warn, because this may not be the true HEAD.
+  local b
+  if b="$(newest_cached_bytecode_aql)"; then
+    red "note: could not reach aql main; using newest cached build ($(basename "$b")) — may lag HEAD" >&2
+    echo "$b"; return 0
+  fi
+  supports_force_compile aql && { red "note: could not reach aql main; using on-PATH aql — may lag HEAD" >&2; command -v aql; return 0; }
   return 1
 }
 
