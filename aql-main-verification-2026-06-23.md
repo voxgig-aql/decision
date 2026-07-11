@@ -25,6 +25,23 @@ The gate (`test/diverge.sh`) tracks `main` HEAD and now treats **`check` as a
 hard invariant** (it was advisory status while false positives remained). No
 library source change is needed.
 
+### Re-evaluation note (2026-06-24, later same day)
+
+Asked to re-pull the newest `main`, but **GitHub egress was locked down
+mid-session** — `api.github.com`, `codeload.github.com`, and the git relay all
+now 403 with *"GitHub access to this repository is not enabled for this session.
+Use add_repo to request access."*, and the `add_repo` MCP tool was unavailable
+to complete. So the newest build reachable is still `407fedad`; re-running the
+full matrix against it is **unchanged** from the results below (interpret ✅,
+check 0 everywhere, `--compile` == interpreter, `prop_test` the one strict-compile
+suite). Whether `main` has advanced past `407fedad` could not be determined.
+
+One DX fix landed from this pass: `test/diverge.sh`'s offline fallback (when it
+can't reach `main` to resolve/build HEAD) now prefers the **newest cached
+bytecode build** over a possibly-stale on-`PATH` `aql`, and prints a note that
+the build may lag HEAD — previously it silently used whatever `aql` was on
+`PATH`, which could report a different compilable subset than the real latest.
+
 ## Builds tracked
 
 | Role | Commit | Notes |
