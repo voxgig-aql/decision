@@ -1,0 +1,43 @@
+# Performance benchmark for the Decision library: build tables/trees once and
+# evaluate them many times, exercising eval-pred, eval-table (priority policy →
+# scans every rule), eval-tree (multi-level walk) and decide. A single Integer
+# checksum keeps the whole body live and makes the compiled and interpreted runs
+# trivially differential-checkable (identical output).
+
+import "./decision.aql"
+
+def table (Decision.with-policy "priority" (Decision.make-table [
+  (Decision.make-rule {field:"age" op:"lt"  value:18} {tier:1})
+  (Decision.make-rule {field:"age" op:"gte" value:65} {tier:3})
+  (Decision.make-rule {field:"age" op:"gte" value:18} {tier:2})
+]))
+
+def tree {kind:"tree" root:"root" nodes:[
+  {id:"root" kind:"branch" branches:[
+    {when:{field:"age" op:"lt"  value:18} next:"minor"}
+    {when:{field:"age" op:"gte" value:18} next:"check"}
+  ]}
+  {id:"check" kind:"branch" branches:[
+    {when:{field:"score" op:"gte" value:50} next:"pass"}
+    {when:{field:"score" op:"lt"  value:50} next:"fail"}
+  ]}
+  {id:"minor" kind:"leaf" result:0}
+  {id:"pass"  kind:"leaf" result:1}
+  {id:"fail"  kind:"leaf" result:2}
+]}
+
+def pred (Decision.all-of [
+  {field:"age"   op:"gte" value:18}
+  {field:"score" op:"gte" value:50}
+])
+
+def acc 0
+for 3000 [
+  def n i
+  def input {age:(n 90 mod) score:(n 100 mod)}
+  def _t (Decision.decide table input)
+  def _leaf (Decision.decide tree input)
+  def ok (Decision.eval-pred pred input)
+  def acc (if ok [acc 1 add] [acc])
+] end
+print (acc)
