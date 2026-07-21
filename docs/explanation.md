@@ -208,7 +208,7 @@ exception you must catch. The `collect` policy carries the same spirit:
 This library is a port of the interpreter's internal `aql:decision`
 module written **entirely in AQL** — no Go, no native extensions. It
 imports no `aql:*` dependencies; it builds only on language features
-that landed by aql `958c379b` (`surface`/`exposes`, generics,
+that landed by aql `61856202` (`surface`/`exposes`, generics,
 `refine Record`, and `fnsig`). The practical upshot is that the whole
 module is readable, hackable, and portable AQL you can vendor into a
 project with a single `import "./decision.aql"` — the behaviour is

@@ -20,7 +20,7 @@ import "./decision.aql"
 The path resolves **relative to the working directory the script is run
 from**, not the importing file — run scripts from the directory where
 `./decision.aql` is valid. The library imports no `aql:*` dependencies,
-so a consumer needs nothing else; it does require **aql ≥ `958c379b`**
+so a consumer needs nothing else; it does require **aql ≥ `61856202`**
 (it uses `surface`/`exposes`, generics, `refine Record`, and `fnsig`).
 
 ---

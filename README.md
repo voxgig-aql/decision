@@ -120,7 +120,7 @@ test/decision_prop_spec.aql    property-based tests — declarative spec format
 test/decision_smoke_test.aql   end-to-end smoke run over every public word
 test/diverge.sh                multi-mode test gate (tracks latest aql; runs interpreter, check, bytecode)
 docs/                          Diátaxis documentation (above)
-dx-report.md                   developer-experience notes against aql @ 958c379b, re-reviewed at 5aed3834
+dx-report.md                   developer-experience notes against aql @ 61856202, re-reviewed at 5aed3834
 ```
 
 Test files follow a consistent naming convention: `_test.aql` for direct
@@ -129,7 +129,7 @@ property).
 
 ## Running it
 
-Build the `aql` interpreter at the pinned commit `958c379b`, then run any
+Build the `aql` interpreter at the pinned commit `61856202`, then run any
 script or test — see
 [How-to → Install and run](docs/how-to.md#install-and-run-aql):
 

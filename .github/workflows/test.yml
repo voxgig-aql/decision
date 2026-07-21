@@ -15,7 +15,7 @@ on:
 env:
   # aql-lang/aql @ main, 2026-06-06. Pinned to the exact commit this
   # module is verified against.
-  AQL_REF: 958c379b12295652c739a88f2f198726d48897fb
+  AQL_REF: 618562025d9e0154107306927911a8b1b046333c
 
 jobs:
   test:
@@ -54,7 +54,7 @@ jobs:
         run: |
           mkdir -p "$HOME/.local/bin"
           cd aql-src/cmd/go
-          GOFLAGS=-mod=mod go build \
+          GOWORK=off GOFLAGS=-mod=mod go build \
             -ldflags "-X github.com/aql-lang/aql/cmd/go.Version=${AQL_REF}" \
             -o "$HOME/.local/bin/aql" ./aql
 

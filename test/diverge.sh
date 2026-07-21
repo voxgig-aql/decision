@@ -67,7 +67,7 @@ build_ref() {
   red "building aql @ ${ref:0:12} (one-time; cached)…" >&2
   local d; d="$(mktemp -d)"
   if curl -fsSL "$TARBALL/$ref" | tar -xz -C "$d" --strip-components=1 \
-     && ( cd "$d/cmd/go" && GOFLAGS=-mod=mod go build \
+     && ( cd "$d/cmd/go" && GOWORK=off GOFLAGS=-mod=mod go build \
             -ldflags "-X github.com/aql-lang/aql/cmd/go.Version=$ref" -o "$bin" ./aql ); then
     rm -rf "$d"; echo "$bin"; return 0
   fi

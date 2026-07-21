@@ -18,7 +18,7 @@ log() { echo "[session-start] $*" >&2; }
 
 # Keep this in lockstep with ci/test.yml's AQL_REF (the consistency CI job
 # fails if they drift). Full 40-char commit so the build is reproducible.
-AQL_REF=958c379b12295652c739a88f2f198726d48897fb
+AQL_REF=618562025d9e0154107306927911a8b1b046333c
 BIN_DIR="$HOME/.local/bin"
 AQL="$BIN_DIR/aql"
 
@@ -41,7 +41,7 @@ else
   if git clone --quiet https://github.com/aql-lang/aql "$src" \
      && git -C "$src" checkout --quiet "$AQL_REF"; then
     ( cd "$src/cmd/go" \
-      && GOFLAGS=-mod=mod go build \
+      && GOWORK=off GOFLAGS=-mod=mod go build \
            -ldflags "-X github.com/aql-lang/aql/cmd/go.Version=${AQL_REF}" \
            -o "$AQL" ./aql ) \
       && log "Built $("$AQL" -version 2>/dev/null)." \

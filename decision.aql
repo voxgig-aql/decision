@@ -43,7 +43,7 @@
 # (in stack form the model sits on top of the input). Wrap a call in
 # parens, or end it, when a bare value would otherwise follow the verb.
 #
-# Imported via `import "./decision.aql"`. Needs aql ≥ 958c379b (uses
+# Imported via `import "./decision.aql"`. Needs aql ≥ 61856202 (uses
 # surface / exposes / generics / refine Record / fnsig). No aql:* deps.
 
 
