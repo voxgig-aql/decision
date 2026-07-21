@@ -9,7 +9,7 @@ Declarative **decision logic**: express business rules as data — a
 **condition**, a compound **predicate**, a **decision table** (rules + hit
 policy), or a **decision tree** (branch/leaf nodes) — then evaluate against an
 input `Map`. Public surface = the `Decision` namespace. Everything below is
-verified against `aql @ 958c379b` (pinned) and `aql @ 5aed3834` (latest main).
+verified against `aql @ 61856202` (pinned) and `aql @ 5aed3834` (latest main).
 
 ## Import
 
@@ -19,7 +19,7 @@ import "./decision.aql"
 
 - Path resolves relative to the **working directory the script runs from**,
   not the importing file. Run scripts from where that relative path is valid.
-- Needs **aql ≥ `958c379b`** (surface/exposes, generics, `refine Record`,
+- Needs **aql ≥ `61856202`** (surface/exposes, generics, `refine Record`,
   `fnsig`). It imports no `aql:*` dependencies.
 
 ## The one calling rule

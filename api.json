@@ -1,7 +1,7 @@
 {
   "name": "decision",
   "version": "0.1.0",
-  "aql_ref": "958c379",
+  "aql_ref": "6185620",
   "description": "Declarative decision logic for AQL: express business rules as data — a condition, a compound predicate, a decision table (rules with a hit policy), or a decision tree (branch/leaf nodes) — then evaluate them against an input Map. Exposed as the single `Decision` namespace.",
   "conventions": {
     "import": "import \"./decision.aql\"  — binds the `Decision` namespace. Imports no aql:* dependencies; callers need nothing else.",
@@ -14,7 +14,7 @@
     "missing_field_gotcha": "an ordering op (lt/lte/gt/gte) on a MISSING field RAISES `not_comparable` — a missing field is None, not Comparable, so the op raises rather than returning false. eq/neq return false for a missing field; guarantee the field is present, or compare it only with eq/neq. The unary is_* ops cannot gate this — they are not usable inside conditions.",
     "import_resolution": "relative to the working directory the script is run from, not the importing file",
     "external_deps": [],
-    "requires": "needs aql >= 958c379b — uses surface/exposes, generics, refine Record, and fnsig. No aql:* deps."
+    "requires": "needs aql >= 61856202 — uses surface/exposes, generics, refine Record, and fnsig. No aql:* deps."
   },
   "modules": {
     "decision.aql": { "kind": "decision logic", "namespaces": ["Decision"] }

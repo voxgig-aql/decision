@@ -2,7 +2,7 @@
 
 Guidance for an AI coding agent calling this decision-logic library from an
 AQL project. Every code block below is verified to run against
-`aql-lang/aql` @ `958c379b` (the pinned build) and @ `5aed3834` (latest `main`). If you read nothing else, read
+`aql-lang/aql` @ `61856202` (the pinned build) and @ `5aed3834` (latest `main`). If you read nothing else, read
 [The one calling rule](#the-one-calling-rule) and
 [Common mistakes](#common-mistakes).
 
@@ -13,7 +13,7 @@ Declarative **decision logic**: express business rules as data — a
 hit policy), or a **decision tree** (branch/leaf nodes) — then evaluate them
 against an input `Map`. The public surface is the `Decision` namespace.
 
-This library needs **aql ≥ `958c379b`** — it uses `surface`/`exposes`,
+This library needs **aql ≥ `61856202`** — it uses `surface`/`exposes`,
 generics, `refine Record`, and `fnsig`. It imports no `aql:*` dependencies.
 
 > **Calling convention.** Forward args, receiver (the model/input) last:

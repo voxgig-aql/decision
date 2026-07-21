@@ -66,7 +66,7 @@ it may lag HEAD).
 
 | Role | Commit | Notes |
 |------|--------|-------|
-| Project pinned interpreter (`AQL_REF`) | `958c379b` | the library's interpreter baseline; bump is optional, see below |
+| Project pinned interpreter (`AQL_REF`) | `61856202` | the library's interpreter baseline; bump is optional, see below |
 | earlier main | `c44d994f`, `f8ee6426`, `65410b18`, `14036b41` | prior passes (see trend) |
 | **Latest main (this pass)** | `407fedad` | what the gate tracks; checker now fully clean |
 
@@ -150,7 +150,7 @@ auto-detects what compiles.
 - **CI follow-ups (need a `workflow`-scope token — currently blocked here).**
   The `.github/workflows/test.yml` "Static check (advisory, non-gating)" step
   runs `aql check --soft decision.aql` with `continue-on-error: true` against the
-  pinned `AQL_REF = 958c379b`, where `decision.aql` still shows its old
+  pinned `AQL_REF = 61856202`, where `decision.aql` still shows its old
   diagnostics. To promote it to a real gate, a maintainer should **(a)** bump
   `AQL_REF` to a clean build (`0b010ae` or newer) across the workflow, the
   session-start hook, and `api.json`, then **(b)** drop `--soft` and
@@ -158,7 +158,7 @@ auto-detects what compiles.
   touch `.github/workflows/`, which this session's token cannot push.
 - **`--force-compile` stays advisory** until the upstream code-body / dynamic-help
   work lands.
-- The library still only *requires* `aql ≥ 958c379b`; bumping the baseline pin is
+- The library still only *requires* `aql ≥ 61856202`; bumping the baseline pin is
   safe but optional.
 
 ## Reproduce (per mode)

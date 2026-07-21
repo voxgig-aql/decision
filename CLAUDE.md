@@ -36,4 +36,4 @@ mistakes to avoid. Every example there is verified against the pinned
   [docs/how-to.md](docs/how-to.md#run-the-suites-under-every-execution-mode).
 - Known AQL-runtime gotchas observed with the pinned build are in
   `dx-report.md`. The pinned aql commit is single-sourced in `.github/workflows/test.yml`
-  (`AQL_REF` = `958c379b`); a CI job fails if the hook or `api.json` drift from it.
+  (`AQL_REF` = `61856202`); a CI job fails if the hook or `api.json` drift from it.

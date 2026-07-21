@@ -27,7 +27,7 @@ fails on the repo's replace directives):
 ```bash
 git clone https://github.com/aql-lang/aql /tmp/aql-source
 cd /tmp/aql-source
-git checkout 958c379b12295652c739a88f2f198726d48897fb   # the commit CI pins (.github/workflows/test.yml AQL_REF)
+git checkout 618562025d9e0154107306927911a8b1b046333c   # the commit CI pins (.github/workflows/test.yml AQL_REF)
 cd cmd/go
 GOFLAGS=-mod=mod go build -o "$HOME/.local/bin/aql" ./aql
 ```
@@ -46,7 +46,7 @@ from the repo root:
 aql test/decision_smoke_test.aql
 ```
 
-This module needs aql ≥ `958c379b` — it uses `surface`/`exposes`,
+This module needs aql ≥ `61856202` — it uses `surface`/`exposes`,
 generics, `refine Record`, and `fnsig`, and imports no `aql:*`
 dependencies. The CI workflow (`.github/workflows/test.yml`) pins the
 same commit.
@@ -474,7 +474,7 @@ they are divergence-checked automatically — no edit needed.
 Resolving the build (latest `main` by default): the gate uses
 `$BYTECODE_AQL` if you point it at a binary, otherwise it builds
 `$BYTECODE_AQL_REF` (default: current `main` HEAD), caching by sha in
-`~/.local/bin`. The project's pinned `AQL_REF` (`958c379b`) predates the
+`~/.local/bin`. The project's pinned `AQL_REF` (`61856202`) predates the
 bytecode compiler and is **only** the interpreter baseline — the gate's
 build is independent of it. Because the proxy git relay is scoped, the
 source is fetched as an HTTPS tarball from codeload; a new sha needs `go`
