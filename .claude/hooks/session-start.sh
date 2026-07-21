@@ -18,7 +18,7 @@ log() { echo "[session-start] $*" >&2; }
 
 # Keep this in lockstep with ci/test.yml's AQL_REF (the consistency CI job
 # fails if they drift). Full 40-char commit so the build is reproducible.
-AQL_REF=618562025d9e0154107306927911a8b1b046333c
+AQL_REF="${AQL_REF:-$(git ls-remote https://github.com/aql-lang/aql.git main 2>/dev/null | cut -f1)}"
 BIN_DIR="$HOME/.local/bin"
 AQL="$BIN_DIR/aql"
 
@@ -28,9 +28,14 @@ if [ -n "${CLAUDE_ENV_FILE:-}" ]; then
 fi
 export PATH="$BIN_DIR:$PATH"
 
-if command -v aql >/dev/null 2>&1 || [ -x "$AQL" ]; then
-  log "aql already present ($("$AQL" -version 2>/dev/null || aql -version 2>/dev/null)); skipping build."
+have_ref="$( { "$AQL" -version 2>/dev/null || aql -version 2>/dev/null; } | awk '{print $NF}' )"
+if { [ -n "$AQL_REF" ] && [ "$have_ref" = "$AQL_REF" ]; } || { [ -z "$AQL_REF" ] && [ -n "$have_ref" ]; }; then
+  log "aql already present at ${have_ref:-unknown} (main HEAD ${AQL_REF:-unresolved}); skipping build."
 else
+  if [ -z "$AQL_REF" ]; then
+    log "WARNING: could not resolve aql main HEAD (network?) and no usable aql present; see docs/how-to.md."
+    exit 0
+  fi
   if ! command -v go >/dev/null 2>&1; then
     log "WARNING: Go toolchain not found; cannot build aql. Install Go, or build aql manually (see docs/how-to.md)."
     exit 0
