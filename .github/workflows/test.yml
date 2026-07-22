@@ -11,11 +11,8 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
-
-env:
-  # aql-lang/aql @ main, 2026-06-06. Pinned to the exact commit this
-  # module is verified against.
-  AQL_REF: 618562025d9e0154107306927911a8b1b046333c
+  schedule:
+    - cron: '0 6 * * *'
 
 jobs:
   test:
@@ -31,19 +28,23 @@ jobs:
 
       # The compiled binary only depends on AQL_REF (and the OS), so a
       # hit here lets us skip the clone + build entirely.
+      - name: Resolve aql main HEAD
+        id: aqlref
+        run: echo "sha=$(git ls-remote https://github.com/aql-lang/aql.git main | cut -f1)" >> "$GITHUB_OUTPUT"
+
       - name: Cache aql binary
         id: cache-aql
         uses: actions/cache@v4
         with:
           path: ~/.local/bin/aql
-          key: aql-${{ env.AQL_REF }}-${{ runner.os }}
+          key: aql-${{ steps.aqlref.outputs.sha }}-${{ runner.os }}
 
       - name: Check out aql source
         if: steps.cache-aql.outputs.cache-hit != 'true'
         uses: actions/checkout@v4
         with:
           repository: aql-lang/aql
-          ref: ${{ env.AQL_REF }}
+          ref: ${{ steps.aqlref.outputs.sha }}
           path: aql-src
 
       # The documented `go install …/cmd/go/aql@latest` cannot work
@@ -55,7 +56,7 @@ jobs:
           mkdir -p "$HOME/.local/bin"
           cd aql-src/cmd/go
           GOWORK=off GOFLAGS=-mod=mod go build \
-            -ldflags "-X github.com/aql-lang/aql/cmd/go.Version=${AQL_REF}" \
+            -ldflags "-X github.com/aql-lang/aql/cmd/go.Version=${{ steps.aqlref.outputs.sha }}" \
             -o "$HOME/.local/bin/aql" ./aql
 
       - name: Add aql to PATH
@@ -128,25 +129,3 @@ jobs:
               exit 1
             fi
           done
-
-      # The pinned aql commit lives in several files; they must agree or a
-      # session/CI builds a different interpreter than the one this library is
-      # verified against (the exact drift that bit the trie sibling repo).
-      # .github/workflows/test.yml's env.AQL_REF (full 40-char) is the single source of truth;
-      # api.json stores a short prefix, so compare by prefix.
-      - name: Pinned aql ref is consistent across files
-        run: |
-          ref='${{ env.AQL_REF }}'
-          fail=0
-          hook_ref=$(grep -oE 'AQL_REF=[0-9a-f]{7,40}' .claude/hooks/session-start.sh | head -1 | cut -d= -f2)
-          if [ "$hook_ref" != "$ref" ]; then
-            echo "::error file=.claude/hooks/session-start.sh::AQL_REF=$hook_ref != .github/workflows/test.yml AQL_REF=$ref"
-            fail=1
-          fi
-          api_ref=$(python3 -c "import json;print(json.load(open('api.json'))['aql_ref'])")
-          if [ "${ref:0:${#api_ref}}" != "$api_ref" ]; then
-            echo "::error file=api.json::aql_ref=$api_ref is not a prefix of .github/workflows/test.yml AQL_REF=$ref"
-            fail=1
-          fi
-          [ "$fail" = 0 ] && echo "ok: pinned aql ref consistent ($ref; api.json prefix $api_ref)"
-          exit $fail

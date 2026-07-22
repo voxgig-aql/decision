@@ -1,57 +1,253 @@
 {
   "name": "decision",
   "version": "0.1.0",
-  "aql_ref": "6185620",
-  "description": "Declarative decision logic for AQL: express business rules as data — a condition, a compound predicate, a decision table (rules with a hit policy), or a decision tree (branch/leaf nodes) — then evaluate them against an input Map. Exposed as the single `Decision` namespace.",
+  "aql_ref": "main",
+  "description": "Declarative decision logic for AQL: express business rules as data \u2014 a condition, a compound predicate, a decision table (rules with a hit policy), or a decision tree (branch/leaf nodes) \u2014 then evaluate them against an input Map. Exposed as the single `Decision` namespace.",
   "conventions": {
-    "import": "import \"./decision.aql\"  — binds the `Decision` namespace. Imports no aql:* dependencies; callers need nothing else.",
+    "import": "import \"./decision.aql\"  \u2014 binds the `Decision` namespace. Imports no aql:* dependencies; callers need nothing else.",
     "call": "forward form, verb first, then its arguments: `Decision.verb arg1 arg2`. Wrap a call in parens, or end it, when a bare value would otherwise follow the verb and get swallowed: `(Decision.decide table {age:25})`.",
     "evaluator_arg_order": "evaluators take the MODEL first, the input second: `Decision.eval-table table input`, `Decision.decide model input`, `Decision.eval-cond cond input`. (In stack form the model sits on TOP of the input: `input table Decision.eval-table`.) apply-op is `Decision.apply-op rhs op lhs` and computes `lhs op rhs`.",
-    "construct": "Records are plain `refine Record` values — build them with a builder OR write them as Map literals; the evaluators only read fields. Node ids (make-branch/make-leaf/make-tree) are Atoms — quote bare names with /q (e.g. root/q).",
-    "ops": "binary Comparable ops (used in conditions and apply-op): eq, neq, lt, lte, gt, gte. Unary ops: is_true, is_false, is_null, is_not_null — reachable ONLY via the direct two-arg `Decision.apply-op rhs op`, NOT inside a condition/table/tree (eval-cond always supplies a value, so a unary op there raises).",
-    "hit_policies": "for tables: \"first\" (default — first matching rule's then), \"unique\" (the single match; multiple-matches/no-match errors), \"collect\" (a List of every matching rule's then), \"priority\" (the matching rule with the highest `priority` field, default 0).",
+    "construct": "Records are plain `refine Record` values \u2014 build them with a builder OR write them as Map literals; the evaluators only read fields. Node ids (make-branch/make-leaf/make-tree) are Atoms \u2014 quote bare names with /q (e.g. root/q).",
+    "ops": "binary Comparable ops (used in conditions and apply-op): eq, neq, lt, lte, gt, gte. Unary ops: is_true, is_false, is_null, is_not_null \u2014 reachable ONLY via the direct two-arg `Decision.apply-op rhs op`, NOT inside a condition/table/tree (eval-cond always supplies a value, so a unary op there raises).",
+    "hit_policies": "for tables: \"first\" (default \u2014 first matching rule's then), \"unique\" (the single match; multiple-matches/no-match errors), \"collect\" (a List of every matching rule's then), \"priority\" (the matching rule with the highest `priority` field, default 0).",
     "error_results_not_exceptions": "evaluators never throw on a miss; they return a Map {ok:false error:...} with error one of: \"no-match\", \"multiple-matches\", \"unknown-model-kind\", \"no-branch-match\", \"node-not-found\", \"unknown-node-kind\", \"max-depth-exceeded\". A hit is your bare then/leaf value (no ok/error fields); inspect result.error to tell a miss from a hit.",
-    "missing_field_gotcha": "an ordering op (lt/lte/gt/gte) on a MISSING field RAISES `not_comparable` — a missing field is None, not Comparable, so the op raises rather than returning false. eq/neq return false for a missing field; guarantee the field is present, or compare it only with eq/neq. The unary is_* ops cannot gate this — they are not usable inside conditions.",
+    "missing_field_gotcha": "an ordering op (lt/lte/gt/gte) on a MISSING field RAISES `not_comparable` \u2014 a missing field is None, not Comparable, so the op raises rather than returning false. eq/neq return false for a missing field; guarantee the field is present, or compare it only with eq/neq. The unary is_* ops cannot gate this \u2014 they are not usable inside conditions.",
     "import_resolution": "relative to the working directory the script is run from, not the importing file",
     "external_deps": [],
-    "requires": "needs aql >= 61856202 — uses surface/exposes, generics, refine Record, and fnsig. No aql:* deps."
+    "requires": "needs aql >= 61856202 \u2014 uses surface/exposes, generics, refine Record, and fnsig. No aql:* deps."
   },
   "modules": {
-    "decision.aql": { "kind": "decision logic", "namespaces": ["Decision"] }
+    "decision.aql": {
+      "kind": "decision logic",
+      "namespaces": [
+        "Decision"
+      ]
+    }
   },
   "types": {
-    "Comparable": { "kind": "surface", "note": "the cmp contract {cmp: (fnsig [[Self Self] [Integer]])}; the scalar builtins Integer/Float/String/Boolean/Atom expose it. Ordering ops (lt/lte/gt/gte) require Comparable operands." },
-    "Cond": { "kind": "refine Record", "fields": ["field:Atom", "op:String", "value:Any"], "note": "a single field/op/value condition." },
-    "Pred": { "kind": "refine Record", "fields": ["kind:String", "op:String", "children:Any"], "note": "a compound (all/any/not) predicate group." },
-    "Rule": { "kind": "refine Record (generic in R)", "fields": ["when:Map", "then:R"], "note": "a when->then pairing; R is the result type, defaults to Any." },
-    "DTable": { "kind": "refine Record (generic in R, default Any)", "fields": ["kind:String", "rules:List", "hit-policy:String"], "note": "a decision table; hit-policy defaults to \"first\"." },
-    "BranchNode": { "kind": "refine Record", "fields": ["id:Atom", "kind:String", "branches:List"], "note": "an interior tree node; branches = [{when:... next:...} ...]." },
-    "LeafNode": { "kind": "refine Record (generic in R)", "fields": ["id:Atom", "kind:String", "result:R"], "note": "a terminal tree node; R is the result type." },
-    "DTree": { "kind": "refine Record (generic in R, default Any)", "fields": ["kind:String", "root:Atom", "nodes:List"], "note": "a decision tree; root = start node id." }
+    "Comparable": {
+      "kind": "surface",
+      "note": "the cmp contract {cmp: (fnsig [[Self Self] [Integer]])}; the scalar builtins Integer/Float/String/Boolean/Atom expose it. Ordering ops (lt/lte/gt/gte) require Comparable operands."
+    },
+    "Cond": {
+      "kind": "refine Record",
+      "fields": [
+        "field:Atom",
+        "op:String",
+        "value:Any"
+      ],
+      "note": "a single field/op/value condition."
+    },
+    "Pred": {
+      "kind": "refine Record",
+      "fields": [
+        "kind:String",
+        "op:String",
+        "children:Any"
+      ],
+      "note": "a compound (all/any/not) predicate group."
+    },
+    "Rule": {
+      "kind": "refine Record (generic in R)",
+      "fields": [
+        "when:Map",
+        "then:R"
+      ],
+      "note": "a when->then pairing; R is the result type, defaults to Any."
+    },
+    "DTable": {
+      "kind": "refine Record (generic in R, default Any)",
+      "fields": [
+        "kind:String",
+        "rules:List",
+        "hit-policy:String"
+      ],
+      "note": "a decision table; hit-policy defaults to \"first\"."
+    },
+    "BranchNode": {
+      "kind": "refine Record",
+      "fields": [
+        "id:Atom",
+        "kind:String",
+        "branches:List"
+      ],
+      "note": "an interior tree node; branches = [{when:... next:...} ...]."
+    },
+    "LeafNode": {
+      "kind": "refine Record (generic in R)",
+      "fields": [
+        "id:Atom",
+        "kind:String",
+        "result:R"
+      ],
+      "note": "a terminal tree node; R is the result type."
+    },
+    "DTree": {
+      "kind": "refine Record (generic in R, default Any)",
+      "fields": [
+        "kind:String",
+        "root:Atom",
+        "nodes:List"
+      ],
+      "note": "a decision tree; root = start node id."
+    }
   },
   "word_specs": {
     "builders": {
-      "cond":        { "call": "Decision.cond field op value",            "args": ["field:Atom", "op:String", "value:Any"],   "returns": "Cond",       "note": "field is an Atom (age/q); op a String (see ops). A single field/op/value condition." },
-      "all-of":      { "call": "Decision.all-of children",                "args": ["children:List"],                          "returns": "Pred",       "note": "every child condition/predicate must hold. Builds {kind:\"group\" op:\"all\" children:...}." },
-      "any-of":      { "call": "Decision.any-of children",                "args": ["children:List"],                          "returns": "Pred",       "note": "at least one child must hold. Builds {kind:\"group\" op:\"any\" children:...}." },
-      "not-of":      { "call": "Decision.not-of child",                   "args": ["child:Map"],                              "returns": "Pred",       "note": "negate one condition. Builds {kind:\"group\" op:\"not\" children:...}." },
-      "make-rule":   { "call": "Decision.make-rule when then",            "args": ["when:Map", "then:Map"],                   "returns": "Rule",       "note": "pair a `when` (cond/pred Map) with a `then` result. `then` MUST be a Map." },
-      "make-table":  { "call": "Decision.make-table rules",               "args": ["rules:List"],                             "returns": "DTable",     "note": "a list of rules; hit policy defaults to \"first\"." },
-      "with-policy": { "call": "Decision.with-policy policy table",       "args": ["policy:String", "table:Map"],             "returns": "DTable",     "note": "copy `table` with a new hit policy (\"first\"/\"unique\"/\"collect\"/\"priority\")." },
-      "make-branch": { "call": "Decision.make-branch id branches",        "args": ["id:Atom", "branches:List"],               "returns": "BranchNode", "note": "id is an Atom (quote with /q); branches = [{when:... next:...} ...]." },
-      "make-leaf":   { "call": "Decision.make-leaf id result",            "args": ["id:Atom", "result:Any"],                  "returns": "LeafNode",   "note": "id is an Atom (quote with /q); result is any value." },
-      "make-tree":   { "call": "Decision.make-tree root nodes",           "args": ["root:Atom", "nodes:List"],                "returns": "DTree",      "note": "root = the start node id (Atom, quote with /q); nodes = node list." }
+      "cond": {
+        "call": "Decision.cond field op value",
+        "args": [
+          "field:Atom",
+          "op:String",
+          "value:Any"
+        ],
+        "returns": "Cond",
+        "note": "field is an Atom (age/q); op a String (see ops). A single field/op/value condition."
+      },
+      "all-of": {
+        "call": "Decision.all-of children",
+        "args": [
+          "children:List"
+        ],
+        "returns": "Pred",
+        "note": "every child condition/predicate must hold. Builds {kind:\"group\" op:\"all\" children:...}."
+      },
+      "any-of": {
+        "call": "Decision.any-of children",
+        "args": [
+          "children:List"
+        ],
+        "returns": "Pred",
+        "note": "at least one child must hold. Builds {kind:\"group\" op:\"any\" children:...}."
+      },
+      "not-of": {
+        "call": "Decision.not-of child",
+        "args": [
+          "child:Map"
+        ],
+        "returns": "Pred",
+        "note": "negate one condition. Builds {kind:\"group\" op:\"not\" children:...}."
+      },
+      "make-rule": {
+        "call": "Decision.make-rule when then",
+        "args": [
+          "when:Map",
+          "then:Map"
+        ],
+        "returns": "Rule",
+        "note": "pair a `when` (cond/pred Map) with a `then` result. `then` MUST be a Map."
+      },
+      "make-table": {
+        "call": "Decision.make-table rules",
+        "args": [
+          "rules:List"
+        ],
+        "returns": "DTable",
+        "note": "a list of rules; hit policy defaults to \"first\"."
+      },
+      "with-policy": {
+        "call": "Decision.with-policy policy table",
+        "args": [
+          "policy:String",
+          "table:Map"
+        ],
+        "returns": "DTable",
+        "note": "copy `table` with a new hit policy (\"first\"/\"unique\"/\"collect\"/\"priority\")."
+      },
+      "make-branch": {
+        "call": "Decision.make-branch id branches",
+        "args": [
+          "id:Atom",
+          "branches:List"
+        ],
+        "returns": "BranchNode",
+        "note": "id is an Atom (quote with /q); branches = [{when:... next:...} ...]."
+      },
+      "make-leaf": {
+        "call": "Decision.make-leaf id result",
+        "args": [
+          "id:Atom",
+          "result:Any"
+        ],
+        "returns": "LeafNode",
+        "note": "id is an Atom (quote with /q); result is any value."
+      },
+      "make-tree": {
+        "call": "Decision.make-tree root nodes",
+        "args": [
+          "root:Atom",
+          "nodes:List"
+        ],
+        "returns": "DTree",
+        "note": "root = the start node id (Atom, quote with /q); nodes = node list."
+      }
     },
     "evaluators": {
-      "apply-op":   { "call": "Decision.apply-op rhs op lhs",            "args": ["rhs:Any", "op:String", "lhs:Any"],        "returns": "Boolean", "note": "the primitive compare, computing `lhs op rhs`. Ordering ops (lt/lte/gt/gte) need Comparable operands; a non-Comparable operand raises not_comparable." },
-      "eval-cond":  { "call": "Decision.eval-cond cond input",           "args": ["cond:Map", "input:Map"],                  "returns": "Boolean", "note": "reads input.(cond.field) and applies cond.op against cond.value. An ordering op on a missing field raises not_comparable." },
-      "eval-pred":  { "call": "Decision.eval-pred pred input",           "args": ["pred:Map", "input:Map"],                  "returns": "Boolean", "note": "evaluates an all/any/not group (or a bare condition) against input." },
-      "eval-table": { "call": "Decision.eval-table table input",         "args": ["table:Map", "input:Map"],                 "returns": "Map (result) | value | {ok:false error:...}", "note": "runs the table under its hit policy. Pass the TABLE (make-table rules), not the raw rules list. collect returns a List." },
-      "eval-tree":  { "call": "Decision.eval-tree tree input",           "args": ["tree:Map", "input:Map"],                  "returns": "leaf result | {ok:false error:...}", "note": "walks branches to a leaf result." },
-      "decide":     { "call": "Decision.decide model input",             "args": ["model:Map", "input:Map"],                 "returns": "Map (result) | value | {ok:false error:...}", "note": "dispatches on model.kind (\"table\" or \"tree\"). Unknown kind => {ok:false error:\"unknown-model-kind\"}." }
+      "apply-op": {
+        "call": "Decision.apply-op rhs op lhs",
+        "args": [
+          "rhs:Any",
+          "op:String",
+          "lhs:Any"
+        ],
+        "returns": "Boolean",
+        "note": "the primitive compare, computing `lhs op rhs`. Ordering ops (lt/lte/gt/gte) need Comparable operands; a non-Comparable operand raises not_comparable."
+      },
+      "eval-cond": {
+        "call": "Decision.eval-cond cond input",
+        "args": [
+          "cond:Map",
+          "input:Map"
+        ],
+        "returns": "Boolean",
+        "note": "reads input.(cond.field) and applies cond.op against cond.value. An ordering op on a missing field raises not_comparable."
+      },
+      "eval-pred": {
+        "call": "Decision.eval-pred pred input",
+        "args": [
+          "pred:Map",
+          "input:Map"
+        ],
+        "returns": "Boolean",
+        "note": "evaluates an all/any/not group (or a bare condition) against input."
+      },
+      "eval-table": {
+        "call": "Decision.eval-table table input",
+        "args": [
+          "table:Map",
+          "input:Map"
+        ],
+        "returns": "Map (result) | value | {ok:false error:...}",
+        "note": "runs the table under its hit policy. Pass the TABLE (make-table rules), not the raw rules list. collect returns a List."
+      },
+      "eval-tree": {
+        "call": "Decision.eval-tree tree input",
+        "args": [
+          "tree:Map",
+          "input:Map"
+        ],
+        "returns": "leaf result | {ok:false error:...}",
+        "note": "walks branches to a leaf result."
+      },
+      "decide": {
+        "call": "Decision.decide model input",
+        "args": [
+          "model:Map",
+          "input:Map"
+        ],
+        "returns": "Map (result) | value | {ok:false error:...}",
+        "note": "dispatches on model.kind (\"table\" or \"tree\"). Unknown kind => {ok:false error:\"unknown-model-kind\"}."
+      }
     }
   },
   "namespaces": {
-    "Decision": { "kind": "decision logic", "module": "decision.aql", "specs": ["builders", "evaluators"] }
+    "Decision": {
+      "kind": "decision logic",
+      "module": "decision.aql",
+      "specs": [
+        "builders",
+        "evaluators"
+      ]
+    }
   }
 }
