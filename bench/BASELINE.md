@@ -2,10 +2,10 @@
 
 The `Decision` library now runs **fully bytecode-compiled** — every one of the
 five test suites (`decision_{unit,prop}_{test,spec}` + `decision_smoke_test`)
-compiles under strict `aql --force-compile` with output byte-identical to the
+compiles under strict `boru --force-compile` with output byte-identical to the
 interpreter (see `test/diverge.sh`, "5/5 suites compile"). This document records
 the compiled-vs-interpreted performance baseline for that fully-compiled state so
-future `aql` changes can be measured against it.
+future `boru` changes can be measured against it.
 
 ## How to reproduce
 
@@ -19,8 +19,8 @@ builds a priority-policy **decision table**, a multi-level **decision tree**, an
 a compound **predicate** once, then evaluates them across many synthetic inputs
 (`decide` over the table, `decide` over the tree, `eval-pred`) — under two modes:
 
-- **interpreter** — `aql -no-compile`, the tree-walking engine;
-- **compiled** — `aql --force-compile`, the kernel bytecode VM (aborts rather
+- **interpreter** — `boru -no-compile`, the tree-walking engine;
+- **compiled** — `boru --force-compile`, the kernel bytecode VM (aborts rather
   than silently falling back if any part of the program refuses to lower).
 
 Both modes must print the same checksum; the harness fails loudly on divergence.
@@ -29,7 +29,7 @@ the fixed parse/check/compile overhead from the per-iteration execution cost.
 
 ## Baseline numbers
 
-Measured on this environment, `aql` @ `main` `203ea2f` + the compile fixes in
+Measured on this environment, `boru` @ `main` `203ea2f` + the compile fixes in
 this work, `iters=3000`, best-of-3:
 
 | metric | interpreter | compiled | ratio |
@@ -52,5 +52,5 @@ Reading the numbers:
   suites' differential gate enforces.
 
 The absolute seconds are environment-specific; the **ratios** are the durable
-baseline. Re-run `bench/bench.sh` after an `aql` bump and compare the ratio and
+baseline. Re-run `bench/bench.sh` after an `boru` bump and compare the ratio and
 per-iteration µs, not the wall-clock.

@@ -1,8 +1,8 @@
 # AGENTS.md — using the `Decision` library
 
 Guidance for an AI coding agent calling this decision-logic library from an
-AQL project. Every code block below is verified to run against
-`aql-lang/aql` @ `61856202` (the pinned build) and @ `5aed3834` (latest `main`). If you read nothing else, read
+boru project. Every code block below is verified to run against
+`boru-lang/boru` @ `61856202` (the pinned build) and @ `5aed3834` (latest `main`). If you read nothing else, read
 [The one calling rule](#the-one-calling-rule) and
 [Common mistakes](#common-mistakes).
 
@@ -13,8 +13,8 @@ Declarative **decision logic**: express business rules as data — a
 hit policy), or a **decision tree** (branch/leaf nodes) — then evaluate them
 against an input `Map`. The public surface is the `Decision` namespace.
 
-This library needs **aql ≥ `61856202`** — it uses `surface`/`exposes`,
-generics, `refine Record`, and `fnsig`. It imports no `aql:*` dependencies.
+This library needs **boru ≥ `61856202`** — it uses `surface`/`exposes`,
+generics, `refine Record`, and `fnsig`. It imports no `boru:*` dependencies.
 
 > **Calling convention.** Forward args, receiver (the model/input) last:
 > `Decision.decide model input`. Piping the input in also works
@@ -24,7 +24,7 @@ generics, `refine Record`, and `fnsig`. It imports no `aql:*` dependencies.
 
 ## Import
 
-```aql
+```boru
 import "./decision.aql"
 ```
 
@@ -34,7 +34,7 @@ import "./decision.aql"
 
 ## The one calling rule
 
-AQL is not C/Python/JS. There is no `f(a, b)` and no `obj.method(a)`. The
+boru is not C/Python/JS. There is no `f(a, b)` and no `obj.method(a)`. The
 canonical form is **forward** — the verb first, then its arguments, with the
 **receiver last**:
 
@@ -55,14 +55,14 @@ Because the receiver is the last parameter, a stack/piping form *also* binds
 backwards — prefer forward. What you must **not** do is put the receiver
 *first* in an all-forward call:
 
-```aql
+```boru
 (Decision.decide table {age:25})    # ✓ model, then input (receiver) last => a result
 (Decision.decide {age:25} table)    # ✗ receiver first: binds model:={age:25}
                                      #   => {ok:false error:"unknown-model-kind"}
 ```
 
 That swap is **silent**. `model` and `input` are both `Map`, so nothing
-type-checks it, and — unlike a plain word — `aql check`'s `mixed_form_call`
+type-checks it, and — unlike a plain word — `boru check`'s `mixed_form_call`
 nudge does **not** fire on the namespaced `Decision.*` dispatch path. You just
 get a plausible-looking error Map (`unknown-model-kind`, or `no-match`) back,
 so getting the order right matters.
@@ -128,7 +128,7 @@ write them as Map literals; the evaluators only read fields.
 
 A decision **table** (first-match routing):
 
-```aql
+```boru
 import "./decision.aql"
 def rules [
   (Decision.make-rule {field:"age" op:"lt"  value:18} {category:"minor"})
@@ -142,7 +142,7 @@ def table (Decision.make-table rules)
 
 A compound condition inside a rule (`all-of` / `any-of` / `not-of`):
 
-```aql
+```boru
 def rule (Decision.make-rule
   {kind:"group" op:"all" children:[
     {field:"age"   op:"gte" value:18}
@@ -156,7 +156,7 @@ def tbl (Decision.make-table [rule])
 
 Collect every matching rule instead of just the first:
 
-```aql
+```boru
 def tags (Decision.with-policy "collect" (Decision.make-table [
   (Decision.make-rule {field:"age"   op:"gte" value:18} {tag:"adult"})
   (Decision.make-rule {field:"score" op:"gte" value:50} {tag:"passing"})
@@ -166,7 +166,7 @@ def tags (Decision.with-policy "collect" (Decision.make-table [
 
 A decision **tree** (branch → leaf):
 
-```aql
+```boru
 def tree {kind:"tree" root:"root" nodes:[
   {id:"root" kind:"branch" branches:[
     {when:{field:"age" op:"lt"  value:18} next:"minor"}
@@ -180,7 +180,7 @@ def tree {kind:"tree" root:"root" nodes:[
 
 Test one condition or one operator directly:
 
-```aql
+```boru
 (Decision.eval-cond {field:"age" op:"gte" value:18} {age:25}) print   # => true
 (Decision.apply-op 18 "gte" 25) print                                  # => true  (lhs 25 gte rhs 18)
 ```
@@ -209,4 +209,4 @@ chain like `(a) print (b) print` can reorder. Write `print (value) end` (or
   order, return types).
 - `docs/how-to.md` — task recipes (tables, trees, hit policies, testing).
 - `test/decision_smoke_test.aql` — a complete, runnable worked example.
-- `dx-report.md` — AQL-runtime notes observed building this library.
+- `dx-report.md` — boru-runtime notes observed building this library.

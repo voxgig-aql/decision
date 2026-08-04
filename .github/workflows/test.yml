@@ -1,9 +1,9 @@
 name: tests
 
-# The decision module is written in AQL, so CI has to build the
-# `aql` interpreter from source before it can run anything. The
+# The decision module is written in boru, so CI has to build the
+# `boru` interpreter from source before it can run anything. The
 # language has no tagged release yet and has shipped breaking changes
-# between commits, so we pin AQL_REF to the exact commit this module is
+# between commits, so we pin BORU_REF to the exact commit this module is
 # verified against. Bump it (and re-run the suites locally) when
 # adopting a newer aql.
 on:
@@ -26,63 +26,63 @@ jobs:
         with:
           go-version: '1.24'
 
-      # The compiled binary only depends on AQL_REF (and the OS), so a
+      # The compiled binary only depends on BORU_REF (and the OS), so a
       # hit here lets us skip the clone + build entirely.
-      - name: Resolve aql main HEAD
-        id: aqlref
-        run: echo "sha=$(git ls-remote https://github.com/aql-lang/aql.git main | cut -f1)" >> "$GITHUB_OUTPUT"
+      - name: Resolve boru main HEAD
+        id: boruref
+        run: echo "sha=$(git ls-remote https://github.com/boru-lang/boru.git main | cut -f1)" >> "$GITHUB_OUTPUT"
 
-      - name: Cache aql binary
-        id: cache-aql
+      - name: Cache boru binary
+        id: cache-boru
         uses: actions/cache@v4
         with:
-          path: ~/.local/bin/aql
-          key: aql-${{ steps.aqlref.outputs.sha }}-${{ runner.os }}
+          path: ~/.local/bin/boru
+          key: boru-${{ steps.boruref.outputs.sha }}-${{ runner.os }}
 
-      - name: Check out aql source
-        if: steps.cache-aql.outputs.cache-hit != 'true'
+      - name: Check out boru source
+        if: steps.cache-boru.outputs.cache-hit != 'true'
         uses: actions/checkout@v4
         with:
-          repository: aql-lang/aql
-          ref: ${{ steps.aqlref.outputs.sha }}
-          path: aql-src
+          repository: boru-lang/boru
+          ref: ${{ steps.boruref.outputs.sha }}
+          path: boru-src
 
       # The documented `go install …/cmd/go/aql@latest` cannot work
       # while cmd/go/go.mod carries replace directives, so we build from
       # the clone with -mod=mod instead.
-      - name: Build aql
-        if: steps.cache-aql.outputs.cache-hit != 'true'
+      - name: Build boru
+        if: steps.cache-boru.outputs.cache-hit != 'true'
         run: |
           mkdir -p "$HOME/.local/bin"
-          cd aql-src/cmd/go
+          cd boru-src/cmd/go
           GOWORK=off GOFLAGS=-mod=mod go build \
-            -ldflags "-X github.com/aql-lang/aql/cmd/go.Version=${{ steps.aqlref.outputs.sha }}" \
-            -o "$HOME/.local/bin/aql" ./aql
+            -ldflags "-X github.com/boru-lang/boru/cmd/go.Version=${{ steps.boruref.outputs.sha }}" \
+            -o "$HOME/.local/bin/boru" ./boru
 
-      - name: Add aql to PATH
+      - name: Add boru to PATH
         run: echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
-      - name: Report aql version
-        run: aql -version
+      - name: Report boru version
+        run: boru -version
 
       # Each suite ends with `0 test.fail-count end assert.equal`, so a
-      # failure makes aql exit non-zero and fails the step.
+      # failure makes boru exit non-zero and fails the step.
       - name: Unit tests (direct)
-        run: aql test/decision_unit_test.aql
+        run: boru test/decision_unit_test.aql
 
       - name: Unit tests (spec format)
-        run: aql test/decision_unit_spec.aql
+        run: boru test/decision_unit_spec.aql
 
       - name: Property tests (direct)
-        run: aql test/decision_prop_test.aql
+        run: boru test/decision_prop_test.aql
 
       - name: Property tests (spec format)
-        run: aql test/decision_prop_spec.aql
+        run: boru test/decision_prop_spec.aql
 
       - name: Smoke test
-        run: aql test/decision_smoke_test.aql
+        run: boru test/decision_smoke_test.aql
 
-      # Advisory static check — NOT a gate. `aql check` is a structural type
+      # Advisory static check — NOT a gate. `boru check` is a structural type
       # checker, but this library exports its words by reference (`cond/r`,
       # …) and dispatches dynamically, so the checker can't trace those exports
       # and reports false `unused_def`/`no_signature` diagnostics on code the
@@ -92,12 +92,12 @@ jobs:
       # real gate.
       - name: Static check (advisory, non-gating)
         continue-on-error: true
-        run: aql check --soft decision.aql
+        run: boru check --soft decision.aql
 
   # Lightweight guard for the agent-skill packaging and the pinned-ref single
-  # source of truth (no aql needed). The plugin must bundle its own copy of the
+  # source of truth (no boru needed). The plugin must bundle its own copy of the
   # skill — plugins can't point at an external .claude/skills dir — so two
-  # copies exist and can drift; and the aql commit is pinned in several files
+  # copies exist and can drift; and the boru commit is pinned in several files
   # that must agree.
   consistency:
     runs-on: ubuntu-latest

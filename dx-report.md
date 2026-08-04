@@ -1,7 +1,7 @@
-# Developer-experience report: porting `aql:decision` — notes for improving AQL
+# Developer-experience report: porting `boru:decision` — notes for improving boru
 
 **Date:** 2026-06-11
-**Builds under test:** `aql-lang/aql` @ `958c379b` (the `main` this library
+**Builds under test:** `boru-lang/boru` @ `958c379b` (the `main` this library
 originally targeted) and `db828ec` (the older ref the sibling bloom-filter/trie
 libraries pin). Every finding below was reproduced against the actual binaries;
 the commands and output are quoted verbatim.
@@ -17,14 +17,14 @@ the commands and output are quoted verbatim.
 > this library). All five test suites pass unchanged and every idiom block is
 > byte-identical on both refs, so bumping the pin is verified safe — but the
 > bump itself needs a maintainer, because the workflow file holding the
-> canonical `AQL_REF` requires `workflow` scope to edit (see
+> canonical `BORU_REF` requires `workflow` scope to edit (see
 > [the bump checklist](#re-review-status-on-latest-main-7193a7d3)). Verified
 > evidence per finding:
 > [Re-review: status on latest main](#re-review-status-on-latest-main-7193a7d3).
 
-This report comes out of porting the interpreter's internal `aql:decision`
-module into a standalone pure-AQL library. The port itself went well — the
-module's AQL source ran as a file module essentially unchanged (see
+This report comes out of porting the interpreter's internal `boru:decision`
+module into a standalone pure-boru library. The port itself went well — the
+module's boru source ran as a file module essentially unchanged (see
 [What worked well](#what-worked-well)) — so this is **not** a complaint list;
 it is the set of language/tooling friction points that cost real time, written
 up so they can be fixed at the source.
@@ -45,14 +45,14 @@ Each finding is tagged:
 
 | # | Finding | Tag | Sev | One-line fix | Status @ `7193a7d3` |
 |---|---------|-----|-----|--------------|---------------------|
-| 1 | No installable `aql` release — everyone builds from source | tooling | **high** | Tagged releases + prebuilt binaries; unblock `go install` | **open** |
+| 1 | No installable `boru` release — everyone builds from source | tooling | **high** | Tagged releases + prebuilt binaries; unblock `go install` | **open** |
 | 2 | A swapped argument order has no "did you mean reordered?" hint — and can silently return a *wrong answer* | rough-by-design | **high** | On signature failure, try arg permutations and say so | **partial** — fires for plain words, not namespaced ones |
 | 3 | No first-class key-presence predicate (`has`), and no catch/recover word | language-bug | medium | Add a total `has`/`haskey` Boolean (the missing `get`/`getr` sibling) | **fixed** — `has` shipped |
 | 4 | Errors raised across an import boundary lose their filename + source excerpt and leak a `CallAQL:` prefix | language-bug | medium | Render imported-file errors like entry-file errors | **fixed** |
 | 5 | `print` forward-collects, so sequential prints emit out of order — silently | rough-by-design | medium | Ship `puts`/`println` (= `print/s`); have `check` flag stranded operands | docs fixed; lint open |
 | 6 | `do/error` leaks the caught error on the stack (and `raise`'s own doc example is broken) | rough-by-design | medium | Bind the error as a normal arg; make the construct stack-neutral | **fixed** |
 | 7 | `eq` on maps/lists is identity-based — equal literals compare `false`, silently | rough-by-design | medium | `check`-time warning when both `eq` operands are Map/List (esp. a literal) | docs fixed; lint open |
-| 8 | `aql -version` reports `0.1.0-dev`, ignoring the embedded VCS revision; skew errors misdirect | tooling | medium | Read `debug.ReadBuildInfo` vcs.revision; better "needs newer aql" hint | **fixed** |
+| 8 | `boru -version` reports `0.1.0-dev`, ignoring the embedded VCS revision; skew errors misdirect | tooling | medium | Read `debug.ReadBuildInfo` vcs.revision; better "needs newer boru" hint | **fixed** |
 
 ---
 
@@ -63,7 +63,7 @@ Re-tested 2026-06-11 against `main` @ `7193a7d3` (39 commits past
 (*"fix: decision DX report — do/error stack-neutral, has word,
 import-boundary errors, swapped-arg hint, version stamp, doc fixes"*). All
 five of this library's test suites pass unchanged on `7193a7d3`, every
-AGENTS.md/skill code block re-verified, and `aql check --soft` behaves as
+AGENTS.md/skill code block re-verified, and `boru check --soft` behaves as
 before — so adopting it is safe. Per-finding status, each re-verified
 against the freshly built binary:
 
@@ -71,7 +71,7 @@ against the freshly built binary:
 > ~200 commits past `7193a7d3` — mostly the bytecode-compiler effort, checker
 > accuracy, and vault TUI). Every per-finding status below is unchanged, all
 > five suites still pass, all idiom blocks emit identical output, and the
-> advisory `aql check --soft` noise even dropped (51→39 errors, from the
+> advisory `boru check --soft` noise even dropped (51→39 errors, from the
 > checker-accuracy work). The findings still open — **1** and the
 > namespaced-word half of **2** — are still open verbatim. If the pin is
 > bumped, `5aed3834` is the newest verified-safe target; the checklist below
@@ -86,7 +86,7 @@ from a pinned clone — this review hand-built yet another one.
 plain words, in both the forward and the stack form:
 
 ```
-$ aql -e 'def wp fn [[p:String t:Map] [Map] [t]] wp {a:1} "collect"'
+$ boru -e 'def wp fn [[p:String t:Map] [Map] [t]] wp {a:1} "collect"'
 error: [aql/signature_error]: no matching signature for wp
   = no signature matches (Map, ProperString); one exists for (String, Map)
     — did you swap the arguments? expected: wp p:String t:Map
@@ -108,13 +108,13 @@ Boolean presence test that distinguishes present-but-`None` from absent,
 mirrors `get`'s container table, never raises, and composes in conditions:
 
 ```
-$ aql -e '{a:None} "a" has'                  # present, value None
+$ boru -e '{a:None} "a" has'                  # present, value None
 true
-$ aql -e '{a:1} "b" has'                     # absent
+$ boru -e '{a:1} "b" has'                     # absent
 false
-$ aql -e 'none "a" has'                      # None parent — total
+$ boru -e 'none "a" has'                      # None parent — total
 false
-$ aql -e '[{a:1} {b:2}] filter ["a" has]'    # composes
+$ boru -e '[{a:1} {b:2}] filter ["a" has]'    # composes
 [{a:1}]
 ```
 
@@ -155,8 +155,8 @@ operands is still future work.
 **8 — fixed.** Dev builds now read the embedded VCS stamp:
 
 ```
-$ aql -version
-aql 0.1.0-dev (git 7193a7d3c698, dirty)
+$ boru -version
+boru 0.1.0-dev (git 7193a7d3c698, dirty)
 ```
 
 **Net:** four findings fully fixed (3, 4, 6, 8), two shipped their
@@ -172,31 +172,31 @@ libraries actually use.
 miniature): set the new ref in every lockstep location, then re-run the
 suites —
 
-1. `.github/workflows/test.yml` → `AQL_REF: 5aed3834d9cc1bd4fd1ea5ad5b5ef37f9c973574`
+1. `.github/workflows/test.yml` → `BORU_REF: 5aed3834d9cc1bd4fd1ea5ad5b5ef37f9c973574`
    (the single source of truth the consistency job checks the rest against),
-2. `.claude/hooks/session-start.sh` → the same 40-char `AQL_REF`,
+2. `.claude/hooks/session-start.sh` → the same 40-char `BORU_REF`,
 3. `api.json` → `"aql_ref": "5aed3834"`,
 4. the short-ref mentions in `README.md` ("pinned commit"), `CLAUDE.md`
-   (`AQL_REF =`), and `docs/how-to.md` (the `git checkout` line).
+   (`BORU_REF =`), and `docs/how-to.md` (the `git checkout` line).
 
 ---
 
-## 1. No installable `aql` release — every consumer builds from source · *tooling · high*
+## 1. No installable `boru` release — every consumer builds from source · *tooling · high*
 
 > **Re-review @ `7193a7d3`: still open.** See [the re-review](#re-review-status-on-latest-main-7193a7d3); the section below is the original finding, kept as the record.
 
-A downstream pure-AQL library needs a *specific* `aql` binary to run and test
+A downstream pure-boru library needs a *specific* `boru` binary to run and test
 its module (this one requires `958c379b`). There is no tagged release, no
 `brew`/binary download, and `go install` is blocked:
 
 ```
-$ go install github.com/aql-lang/aql/cmd/go/aql@latest
+$ go install github.com/boru-lang/boru/cmd/go/aql@latest
 go: ...cmd/go@v0.0.0-20260611024449-958c379b1229: The go.mod file for the module
 providing named packages contains one or more replace directives. It must not
 contain directives that would cause it to be interpreted differently than if it
 were the main module.
 
-$ git -C aql tag
+$ git -C boru tag
 eng/go/v0.0.1          # the ONLY tag — and it's the kernel sub-module, not the CLI
 ```
 
@@ -233,12 +233,12 @@ Decision.decide {age:30} table     # => {"error": "unknown-model-kind", "ok": fa
 ```
 
 That output is **byte-identical to a legitimate** `unknown-model-kind` result —
-exit code 0, and `aql check` is clean — so a swapped call looks like a real
+exit code 0, and `boru check` is clean — so a swapped call looks like a real
 domain error and you debug the wrong thing. With distinct types it's instead a
 silent no-dispatch:
 
 ```
-$ aql check -e '... Decision.with-policy table "collect"'   # args swapped (Map, String)
+$ boru check -e '... Decision.with-policy table "collect"'   # args swapped (Map, String)
 check: [error] uncalled_function: call to 'with-policy' matched no signature
        and was left on the stack as data (arguments: Map, ProperString)
 ```
@@ -268,16 +268,16 @@ inputs). It can't be expressed, because there is no way to distinguish *absent*
 from *present-but-`None`*, and no Boolean presence test:
 
 ```
-$ aql -e '{a:1}    "b" get'    # absent
+$ boru -e '{a:1}    "b" get'    # absent
 None
-$ aql -e '{a:None} "a" get'    # present, value is None
+$ boru -e '{a:None} "a" get'    # present, value is None
 None
-$ aql -e '{a:1} "a" has'       # and there is no presence word
+$ boru -e '{a:1} "a" has'       # and there is no presence word
 error: [aql/undefined_word]: undefined word: has      # same for haskey, has-key, in, member
 ```
 
 `getr` *can* tell them apart, but it **raises** rather than returning a Boolean —
-and there is no `try`/`catch`/`recover`/`rescue` word anywhere in `aql describe`
+and there is no `try`/`catch`/`recover`/`rescue` word anywhere in `boru describe`
 to turn that raise into a predicate. So the whole class of presence/optional
 conditions had to be cut from the decision tables/trees (the module's own
 `api.json` documents the surrender).
@@ -341,26 +341,26 @@ field/operands — but the location-rendering gap is the language's.)
 statement's value and the leftovers flush at program end:
 
 ```
-$ aql /tmp/p.aql        # source:  "a" print  "b" print
+$ boru /tmp/p.aql        # source:  "a" print  "b" print
 b
 a
-$ aql /tmp/p3.aql       # three statements, one print each (no `end`)
+$ boru /tmp/p3.aql       # three statements, one print each (no `end`)
 b
 c
 a                       # not even a clean reverse
 ```
 
-It never errors and `aql check` says nothing, so it silently scrambles any
+It never errors and `boru check` says nothing, so it silently scrambles any
 test/smoke/doc snippet that prints a sequence of values — and a 3-way scramble
 makes "is my expected output right?" unreliable. The clean fix already exists
 but is undiscoverable:
 
 ```
-$ aql /tmp/ps.aql       # "a" print/s  "b" print/s  "c" print/s   (stack-only modifier)
+$ boru /tmp/ps.aql       # "a" print/s  "b" print/s  "c" print/s   (stack-only modifier)
 a
 b
 c
-$ aql describe print    # …never mentions /s or the ordering pitfall
+$ boru describe print    # …never mentions /s or the ordering pitfall
 print — Print a value to stdout followed by a newline.  Precedence: forward …
 ```
 
@@ -381,10 +381,10 @@ leaves the caught error on the stack *beneath* the handler's result — so the
 next `def`/sig-match binds the wrong value, or the error auto-prints:
 
 ```
-$ aql -e 'do [ raise "boom" ] error [ "recovered" ]'
+$ boru -e 'do [ raise "boom" ] error [ "recovered" ]'
 error(boom) recovered                         # the error leaked onto stdout
 
-$ aql /tmp/r12.aql       # def result do [ raise "boom" ] error [ "recovered" ]   result print
+$ boru /tmp/r12.aql       # def result do [ raise "boom" ] error [ "recovered" ]   result print
 recovered
 error(boom)              # `def result` bound the top; error(boom) leaked beneath and auto-printed
 ```
@@ -415,7 +415,7 @@ inside an fn body, and inside an `each`/`var` body alike (we initially suspected
 a scope-dependent flip; there is none — it's consistently `false`):
 
 ```
-$ aql /tmp/eq.aql
+$ boru /tmp/eq.aql
 top  : false        # ({a:1} eq {a:1})
 fn   : false        # same, inside an fn body
 each : [false]      # same, inside each/var
@@ -437,20 +437,20 @@ deep-equal helper so test authors stop re-inventing the per-field workaround.
 
 ---
 
-## 8. `aql -version` hides the build commit; skew errors misdirect · *tooling · medium*
+## 8. `boru -version` hides the build commit; skew errors misdirect · *tooling · medium*
 
 > **Re-review @ `7193a7d3`: fixed.** See [the re-review](#re-review-status-on-latest-main-7193a7d3); the section below is the original finding, kept as the record.
 
-A stale `aql` on PATH silently lacked newer words, and `-version` couldn't
+A stale `boru` on PATH silently lacked newer words, and `-version` couldn't
 disambiguate the build — everything not `make publish`'d reads `0.1.0-dev`, even
 though the Go toolchain already embeds the revision:
 
 ```
-$ aql -version
-aql 0.1.0-dev
-$ go version -m $(which aql) | grep vcs
+$ boru -version
+boru 0.1.0-dev
+$ go version -m $(which boru) | grep vcs
 	build	vcs.revision=958c379b12295652c739a88f2f198726d48897fb
-	build	vcs.modified=true            # aql just never reads this
+	build	vcs.modified=true            # boru just never reads this
 ```
 
 And when you *do* run an older build, the version-skew error misdirects — it
@@ -464,20 +464,20 @@ error: [aql/undefined_word]: undefined word: surface
 ```
 
 **Suggestion.** In the `-version` path, when `Version == "0.1.0-dev"`, fall back
-to `debug.ReadBuildInfo()` and append the VCS stamp (e.g. `aql 0.1.0-dev (git
+to `debug.ReadBuildInfo()` and append the VCS stamp (e.g. `boru 0.1.0-dev (git
 958c379b, dirty)`); stop hardcoding `VERSION := 0.1.0-dev` for dev builds. Make
 the `undefined_word` "did you mean (x)/x/q" hint fire only when a same-named
 binding plausibly exists; otherwise emit a neutral *"'surface' is not defined in
-this build — it may be a newer language word; check `aql describe` or upgrade
+this build — it may be a newer language word; check `boru describe` or upgrade
 aql."* (Higher-effort: let `aql.jsonic` declare a minimum engine revision so
-`import`/`check` can fail with *"requires aql ≥ <rev>"*.)
+`import`/`check` can fail with *"requires boru ≥ <rev>"*.)
 
 ---
 
 ## Library-side notes (not language issues)
 
 These tripped the port too, but they are decision-module *design* choices, not
-AQL problems — recorded so they aren't mistaken for language bugs:
+boru problems — recorded so they aren't mistaken for language bugs:
 
 - **Evaluators take the model first, the input second** (`decide model input`).
   A convention, not a language rule. (It's the *diagnostic* when you get it
@@ -494,10 +494,10 @@ AQL problems — recorded so they aren't mistaken for language bugs:
 
 ## What worked well
 
-- **The native module's AQL *is* the library.** `aql:decision` is implemented
-  as an embedded AQL source string with a thin Go loader; that source ran as a
+- **The native module's boru *is* the library.** `boru:decision` is implemented
+  as an embedded boru source string with a thin Go loader; that source ran as a
   standalone file module with **zero changes** (only a header added). That the
-  same AQL works as a built-in module and a vendored file is a real strength of
+  same boru works as a built-in module and a vendored file is a real strength of
   the design.
 - **`refine Record` + generics + `surface`/`exposes`** expressed the typed
   decision records (Cond/Pred/Rule/DTable/DTree, the `Comparable` surface)

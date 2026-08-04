@@ -5,8 +5,8 @@
 # decision table, a multi-level decision tree, and a compound predicate ONCE,
 # then evaluates them across many synthetic inputs — under two execution modes:
 #
-#   * INTERPRETER  (`aql -no-compile`)      — the tree-walking engine
-#   * BYTECODE     (`aql --force-compile`)  — the kernel VM (aborts, never
+#   * INTERPRETER  (`boru -no-compile`)      — the tree-walking engine
+#   * BYTECODE     (`boru --force-compile`)  — the kernel VM (aborts, never
 #                                             silently falls back, if any part
 #                                             of the program refuses to lower)
 #
@@ -15,20 +15,20 @@
 # each mode and the resulting speedup, plus the fixed (n=1) overhead so the
 # per-iteration execution cost can be separated from parse/check/compile.
 #
-# Resolving the aql build mirrors test/diverge.sh: pass a binary explicitly, or
-# let it fall through to an on-PATH `aql`.
+# Resolving the boru build mirrors test/diverge.sh: pass a binary explicitly, or
+# let it fall through to an on-PATH `boru`.
 #
-#   BENCH_AQL=/path/to/aql bash bench/bench.sh
+#   BENCH_AQL=/path/to/boru bash bench/bench.sh
 #   ITERS=3000 RUNS=5      bash bench/bench.sh
 set -uo pipefail
 cd "$(dirname "$0")/.."   # repo root, so `import "./decision.aql"` resolves
 
-AQL="${BENCH_AQL:-${BYTECODE_AQL:-aql}}"
+AQL="${BENCH_AQL:-${BYTECODE_AQL:-boru}}"
 ITERS="${ITERS:-3000}"
 RUNS="${RUNS:-3}"
 SRC="bench/decision_bench.aql"
 
-command -v "$AQL" >/dev/null 2>&1 || { echo "no aql binary ($AQL); set BENCH_AQL"; exit 2; }
+command -v "$AQL" >/dev/null 2>&1 || { echo "no boru binary ($AQL); set BENCH_AQL"; exit 2; }
 
 # Materialise the benchmark at the requested iteration count.
 work="$(mktemp)"; trap 'rm -f "$work" "$over"' EXIT
@@ -49,7 +49,7 @@ cc="$("$AQL" --force-compile "$work" 2>&1)"
 if [ "$ci" != "$cc" ]; then
   echo "DIVERGENCE: interpreter=[$ci] compiled=[$cc]"; exit 1
 fi
-echo "aql:      $("$AQL" -version 2>/dev/null || echo "$AQL")"
+echo "boru:     $("$AQL" -version 2>/dev/null || echo "$AQL")"
 echo "workload: $SRC   iters=$ITERS   runs=$RUNS   checksum=$ci"
 echo
 

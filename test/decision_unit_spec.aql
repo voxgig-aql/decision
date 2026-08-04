@@ -28,7 +28,7 @@
 #   aql test/decision_unit_spec.aql
 
 
-import "aql:test" end
+import "boru:test" end
 import "./decision.aql" end
 
 
