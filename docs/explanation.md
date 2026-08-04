@@ -203,19 +203,19 @@ arbitrary input — it deserves to be a value you can route on, not an
 exception you must catch. The `collect` policy carries the same spirit:
 "nothing matched" is the empty list, a first-class result, not an error.
 
-### Pure AQL, no Go
+### Pure boru, no Go
 
-This library is a port of the interpreter's internal `aql:decision`
-module written **entirely in AQL** — no Go, no native extensions. It
-imports no `aql:*` dependencies; it builds only on language features
-that landed by aql `61856202` (`surface`/`exposes`, generics,
+This library is a port of the interpreter's internal `boru:decision`
+module written **entirely in boru** — no Go, no native extensions. It
+imports no `boru:*` dependencies; it builds only on language features
+that landed by boru `61856202` (`surface`/`exposes`, generics,
 `refine Record`, and `fnsig`). The practical upshot is that the whole
-module is readable, hackable, and portable AQL you can vendor into a
+module is readable, hackable, and portable boru you can vendor into a
 project with a single `import "./decision.aql"` — the behaviour is
 defined by the source you can see, not by a runtime you cannot. It is
 also a worked demonstration that a non-trivial, type-checked DSL — a
 Comparable surface, generic rule/result types, four hit policies, a
-bounded tree walk — fits comfortably inside the AQL language itself.
+bounded tree walk — fits comfortably inside the boru language itself.
 
 ---
 

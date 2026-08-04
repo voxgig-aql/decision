@@ -1,30 +1,30 @@
 ---
 name: decision-aql
-description: Use when writing or editing AQL code that calls the Decision decision-logic library — Decision.cond / all-of / any-of / not-of / make-rule / make-table / with-policy / make-branch / make-leaf / make-tree / eval-cond / eval-pred / eval-table / eval-tree / decide / apply-op, or any file that does `import "./decision.aql"`. Provides the exact AQL calling convention (which is not C/Python/JS) — forward form with the receiver (model/table/input) last — the builders/evaluators/ops/hit-policies, the eq-vs-deq / immutability / has / overflow by-design notes, verified copy-paste idioms (a table and a tree), and fixes for the mistakes agents most often make (foreign call syntax, the silent swapped model/input order, the missing-field `not_comparable` raise).
+description: Use when writing or editing boru code that calls the Decision decision-logic library — Decision.cond / all-of / any-of / not-of / make-rule / make-table / with-policy / make-branch / make-leaf / make-tree / eval-cond / eval-pred / eval-table / eval-tree / decide / apply-op, or any file that does `import "./decision.aql"`. Provides the exact boru calling convention (which is not C/Python/JS) — forward form with the receiver (model/table/input) last — the builders/evaluators/ops/hit-policies, the eq-vs-deq / immutability / has / overflow by-design notes, verified copy-paste idioms (a table and a tree), and fixes for the mistakes agents most often make (foreign call syntax, the silent swapped model/input order, the missing-field `not_comparable` raise).
 ---
 
-# Calling the Decision decision-logic library (AQL)
+# Calling the Decision decision-logic library (boru)
 
 Declarative **decision logic**: express business rules as data — a
 **condition**, a compound **predicate**, a **decision table** (rules + hit
 policy), or a **decision tree** (branch/leaf nodes) — then evaluate against an
 input `Map`. Public surface = the `Decision` namespace. Everything below is
-verified against `aql @ 61856202` (pinned) and `aql @ 5aed3834` (latest main).
+verified against `boru @ 61856202` (pinned) and `boru @ 5aed3834` (latest main).
 
 ## Import
 
-```aql
+```boru
 import "./decision.aql"
 ```
 
 - Path resolves relative to the **working directory the script runs from**,
   not the importing file. Run scripts from where that relative path is valid.
-- Needs **aql ≥ `61856202`** (surface/exposes, generics, `refine Record`,
-  `fnsig`). It imports no `aql:*` dependencies.
+- Needs **boru ≥ `61856202`** (surface/exposes, generics, `refine Record`,
+  `fnsig`). It imports no `boru:*` dependencies.
 
 ## The one calling rule
 
-AQL has no `f(a, b)` and no `obj.method(a)`. The canonical form is **forward**
+boru has no `f(a, b)` and no `obj.method(a)`. The canonical form is **forward**
 — the verb first, then its arguments, with the **receiver last**:
 
 ```
@@ -45,14 +45,14 @@ the last parameter, a stack/piping form *also* binds
 backwards — prefer forward. What you must **not** do is put the receiver
 *first* in an all-forward call:
 
-```aql
+```boru
 (Decision.decide table {age:25})    # ✓ model, then input (receiver) last => a result
 (Decision.decide {age:25} table)    # ✗ receiver first: binds model:={age:25}
                                      #   => {ok:false error:"unknown-model-kind"}
 ```
 
 That swap is **silent**. `model` and `input` are both `Map`, so nothing
-type-checks it, and — unlike a plain word — `aql check`'s `mixed_form_call`
+type-checks it, and — unlike a plain word — `boru check`'s `mixed_form_call`
 nudge does **not** fire on the namespaced `Decision.*` dispatch path. You just
 get a plausible-looking error Map (`unknown-model-kind`, or `no-match`) back,
 so getting the order right matters. (`eval-table` / `with-policy` are luckier:
@@ -112,7 +112,7 @@ highest `priority` field (default `0`).
 
 A decision **table** (first-match routing):
 
-```aql
+```boru
 import "./decision.aql"
 def rules [
   (Decision.make-rule {field:"age" op:"lt"  value:18} {category:"minor"})
@@ -126,7 +126,7 @@ def table (Decision.make-table rules)
 
 Collect every matching rule instead of just the first:
 
-```aql
+```boru
 def tags (Decision.with-policy "collect" (Decision.make-table [
   (Decision.make-rule {field:"age"   op:"gte" value:18} {tag:"adult"})
   (Decision.make-rule {field:"score" op:"gte" value:50} {tag:"passing"})
@@ -136,7 +136,7 @@ def tags (Decision.with-policy "collect" (Decision.make-table [
 
 A decision **tree** (branch → leaf):
 
-```aql
+```boru
 def tree {kind:"tree" root:"root" nodes:[
   {id:"root" kind:"branch" branches:[
     {when:{field:"age" op:"lt"  value:18} next:"minor"}
@@ -148,7 +148,7 @@ def tree {kind:"tree" root:"root" nodes:[
 (Decision.decide tree {age:40}) print   # => welcome
 ```
 
-## By-design notes (AQL)
+## By-design notes (boru)
 
 - **`eq` is identity; `deq` is structural.** `{a:1} {a:1} eq` → `false`; use
   `deq` for structural equality of `Map`/`List` values

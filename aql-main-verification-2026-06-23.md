@@ -1,7 +1,7 @@
-# aql `main` mode-verification report
+# boru `main` mode-verification report
 
 **Date:** 2026-06-24 (latest re-test)
-**Task:** track latest `aql` `main` and verify that **interpreting**, **checking**,
+**Task:** track latest `boru` `main` and verify that **interpreting**, **checking**,
 and **compiling** work against the `Decision` suites; review the upstream design
 docs that bear on the open gaps.
 
@@ -19,26 +19,26 @@ earlier passes.
 
 | Mode | `407fedad` (baseline) | Verdict |
 |------|--------------------------|---------|
-| **Interpreting** (`aql suite.aql`) | all 5 suites pass | ✅ **fully works** |
-| **Checking** (`aql check suite.aql`) | all 5 suites **0 errors**; `decision.aql` itself **0 errors** | ✅ **clean** |
+| **Interpreting** (`boru suite.aql`) | all 5 suites pass | ✅ **fully works** |
+| **Checking** (`boru check suite.aql`) | all 5 suites **0 errors**; `decision.aql` itself **0 errors** | ✅ **clean** |
 | **`--compile` == interpreter** | byte-identical on all 5 suites | ✅ **no divergence** |
 | **`--force-compile`** (strict, no fallback) | `prop_test` compiles; the rest refuse on code-body words (→ 2/5 on 2026-07-11 `main`) | ⚠️ **partial, improving** |
 
 Upstream's checker-precision work landed: the namespace / dynamic-dispatch
 false positives that gave `decision_smoke_test` 16 errors and `decision.aql` 2
 are **gone** (independently re-verified upstream in
-[`CLIENT-VERIFICATION-MAIN-2026-06-24.md`](https://github.com/aql-lang/aql/blob/main/design/CLIENT-VERIFICATION-MAIN-2026-06-24.md)).
+[`CLIENT-VERIFICATION-MAIN-2026-06-24.md`](https://github.com/boru-lang/boru/blob/main/design/CLIENT-VERIFICATION-MAIN-2026-06-24.md)).
 The gate (`test/diverge.sh`) tracks `main` HEAD and now treats **`check` as a
 hard invariant** (it was advisory status while false positives remained). No
 library source change is needed.
 
 ### Re-evaluation on latest `main` (2026-07-11, fetched over plain HTTP)
 
-`codeload`, `api.github.com`, and the git relay are all gated for `aql-lang/aql`
+`codeload`, `api.github.com`, and the git relay are all gated for `boru-lang/boru`
 this session (403, *"Use add_repo to request access."*), but
 **`raw.githubusercontent.com` is not** — so `main` was reconstructed by pulling
 every file over HTTP from GitHub raw (using jsDelivr's data API only as the file
-**manifest**), and built (`go build ./aql`, `GOWORK=off`). The exact HEAD sha
+**manifest**), and built (`go build ./boru`, `GOWORK=off`). The exact HEAD sha
 isn't recoverable (API gated); this is `main` as of 2026-07-11, ~800 files past
 `407fedad`. Two substantive changes for `decision`:
 
@@ -59,26 +59,26 @@ isn't recoverable (API gated); this is `main` as of 2026-07-11, ~800 files past
   AGENTS.md-prescribed idiom) — verified backward-compatible on `407fedad`.
 
 Also from the prior pass: `test/diverge.sh`'s offline fallback now prefers the
-**newest cached bytecode build** over a possibly-stale on-`PATH` `aql` (and warns
+**newest cached bytecode build** over a possibly-stale on-`PATH` `boru` (and warns
 it may lag HEAD).
 
 ## Builds tracked
 
 | Role | Commit | Notes |
 |------|--------|-------|
-| Project pinned interpreter (`AQL_REF`) | `61856202` | the library's interpreter baseline; bump is optional, see below |
+| Project pinned interpreter (`BORU_REF`) | `61856202` | the library's interpreter baseline; bump is optional, see below |
 | earlier main | `c44d994f`, `f8ee6426`, `65410b18`, `14036b41` | prior passes (see trend) |
 | **Latest main (this pass)** | `407fedad` | what the gate tracks; checker now fully clean |
 
 ### How it was obtained
 
-The proxy's scoped **git relay 403s for `aql-lang/aql`**. A direct HTTPS
+The proxy's scoped **git relay 403s for `boru-lang/boru`**. A direct HTTPS
 **tarball** over the general proxy works:
 
 ```bash
-REF=$(curl -sS https://api.github.com/repos/aql-lang/aql/commits/main | sed -nE 's/.*"sha": *"([0-9a-f]+)".*/\1/p' | head -1)
-curl -fsSL "https://codeload.github.com/aql-lang/aql/tar.gz/$REF" | tar -xz -C /tmp/aql --strip-components=1
-( cd /tmp/aql/cmd/go && GOFLAGS=-mod=mod go build -o ~/.local/bin/aql-main ./aql )
+REF=$(curl -sS https://api.github.com/repos/boru-lang/boru/commits/main | sed -nE 's/.*"sha": *"([0-9a-f]+)".*/\1/p' | head -1)
+curl -fsSL "https://codeload.github.com/boru-lang/boru/tar.gz/$REF" | tar -xz -C /tmp/boru --strip-components=1
+( cd /tmp/aql/cmd/go && GOFLAGS=-mod=mod go build -o ~/.local/bin/boru-main ./boru )
 ```
 
 ## Per-suite results on latest main (`407fedad`)
@@ -149,16 +149,16 @@ auto-detects what compiles.
   re-verified **green** on `407fedad`.
 - **CI follow-ups (need a `workflow`-scope token — currently blocked here).**
   The `.github/workflows/test.yml` "Static check (advisory, non-gating)" step
-  runs `aql check --soft decision.aql` with `continue-on-error: true` against the
-  pinned `AQL_REF = 61856202`, where `decision.aql` still shows its old
+  runs `boru check --soft decision.aql` with `continue-on-error: true` against the
+  pinned `BORU_REF = 61856202`, where `decision.aql` still shows its old
   diagnostics. To promote it to a real gate, a maintainer should **(a)** bump
-  `AQL_REF` to a clean build (`0b010ae` or newer) across the workflow, the
+  `BORU_REF` to a clean build (`0b010ae` or newer) across the workflow, the
   session-start hook, and `api.json`, then **(b)** drop `--soft` and
   `continue-on-error` (optionally looping the check over `test/*.aql`). Both
   touch `.github/workflows/`, which this session's token cannot push.
 - **`--force-compile` stays advisory** until the upstream code-body / dynamic-help
   work lands.
-- The library still only *requires* `aql ≥ 61856202`; bumping the baseline pin is
+- The library still only *requires* `boru ≥ 61856202`; bumping the baseline pin is
   safe but optional.
 
 ## Reproduce (per mode)

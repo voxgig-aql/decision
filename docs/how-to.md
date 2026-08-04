@@ -6,7 +6,7 @@ For the *why* behind any of these, follow the links into the
 [Explanation](explanation.md); for exact signatures, the
 [Reference](reference.md).
 
-- [Install and run aql](#install-and-run-aql)
+- [Install and run boru](#install-and-run-aql)
 - [Choose between a table and a tree](#choose-between-a-table-and-a-tree)
 - [Build a table from rules](#build-a-table-from-rules)
 - [Use compound conditions](#use-compound-conditions)
@@ -18,24 +18,24 @@ For the *why* behind any of these, follow the links into the
 
 ---
 
-## Install and run aql
+## Install and run boru
 
-The module is written in AQL, which has no tagged release yet, so build
+The module is written in boru, which has no tagged release yet, so build
 the interpreter from source (the documented `go install …/aql@latest`
 fails on the repo's replace directives):
 
 ```bash
-git clone https://github.com/aql-lang/aql /tmp/aql-source
+git clone https://github.com/boru-lang/boru /tmp/aql-source
 cd /tmp/aql-source
-git checkout 618562025d9e0154107306927911a8b1b046333c   # the commit CI pins (.github/workflows/test.yml AQL_REF)
+git checkout 618562025d9e0154107306927911a8b1b046333c   # the commit CI pins (.github/workflows/test.yml BORU_REF)
 cd cmd/go
-GOFLAGS=-mod=mod go build -o "$HOME/.local/bin/aql" ./aql
+GOFLAGS=-mod=mod go build -o "$HOME/.local/bin/boru" ./boru
 ```
 
 Make sure `$HOME/.local/bin` is on your `PATH`, then check it:
 
 ```bash
-aql -version
+boru -version
 ```
 
 Run any script in this repo by passing its path. The relative
@@ -43,11 +43,11 @@ Run any script in this repo by passing its path. The relative
 from the repo root:
 
 ```bash
-aql test/decision_smoke_test.aql
+boru test/decision_smoke_test.aql
 ```
 
-This module needs aql ≥ `61856202` — it uses `surface`/`exposes`,
-generics, `refine Record`, and `fnsig`, and imports no `aql:*`
+This module needs boru ≥ `61856202` — it uses `surface`/`exposes`,
+generics, `refine Record`, and `fnsig`, and imports no `boru:*`
 dependencies. The CI workflow (`.github/workflows/test.yml`) pins the
 same commit.
 
@@ -81,7 +81,7 @@ one, `make-table` collects them (defaulting to the `"first"` hit
 policy), and `decide` evaluates the table against an input — **model
 first, input second**:
 
-```aql
+```boru
 import "./decision.aql"
 def rules [
   (Decision.make-rule {field:"age" op:"lt"  value:18} {category:"minor"})
@@ -117,7 +117,7 @@ A single `{field op value}` test is often not enough. `all-of`,
 `when` accepts directly. Build the leaf conditions with `Decision.cond`
 (its `field` is an Atom — quote bare names with `/q`):
 
-```aql
+```boru
 import "./decision.aql"
 def adult (Decision.cond age/q   "gte" 18)
 def high  (Decision.cond score/q "gte" 90)
@@ -132,7 +132,7 @@ print (Decision.decide tbl {age:25 score:50}) end   # => {ok:false error:no-matc
 `any-of` holds when **at least one** child does, and `not-of` negates a
 single condition:
 
-```aql
+```boru
 import "./decision.aql"
 def adult (Decision.cond age/q   "gte" 18)
 def high  (Decision.cond score/q "gte" 90)
@@ -166,7 +166,7 @@ A table's **hit policy** decides what happens when zero, one, or many
 rules match. `make-table` defaults to `"first"`; `with-policy` returns a
 copy of a table under a different policy. There are four:
 
-```aql
+```boru
 import "./decision.aql"
 def rules [
   (Decision.make-rule {field:"score" op:"lt"  value:50} {grade:"fail"})
@@ -183,7 +183,7 @@ print (Decision.decide first-tbl {score:75}) end   # => {grade: pass}
 `{ok:false error:"multiple-matches"}` — use it to assert your rules are
 mutually exclusive:
 
-```aql
+```boru
 import "./decision.aql"
 def utbl (Decision.with-policy "unique" (Decision.make-table [
   (Decision.make-rule {field:"score" op:"lt"  value:50} {grade:"fail"})
@@ -202,7 +202,7 @@ print (Decision.decide overlap {score:75}) end   # => {ok:false error:multiple-m
 **`"collect"`** returns a **List** of every matching rule's `then` —
 useful for tagging, where several labels can apply at once:
 
-```aql
+```boru
 import "./decision.aql"
 def tags (Decision.with-policy "collect" (Decision.make-table [
   (Decision.make-rule {field:"age"   op:"gte" value:18} {tag:"adult"})
@@ -216,7 +216,7 @@ field (default `0`). `priority` is a **top-level** field on the rule,
 alongside `when`/`then` — and since `make-rule` only sets `when`/`then`,
 write priority rules as Map literals:
 
-```aql
+```boru
 import "./decision.aql"
 def ptbl (Decision.with-policy "priority" (Decision.make-table [
   {when:{field:"score" op:"gte" value:50} then:{tier:"standard"} priority:1}
@@ -235,7 +235,7 @@ A tree walks from a root branch node, following the first branch whose
 `make-branch`, `make-leaf`, `make-tree` — whose ids are **Atoms** (quote
 bare names with `/q`):
 
-```aql
+```boru
 import "./decision.aql"
 def root-node (Decision.make-branch root/q [
   {when:{field:"age" op:"lt"  value:18} next:"minor"}
@@ -255,7 +255,7 @@ chain naturally — a branch can point at another branch — which is the
 reason to reach for a tree over a table. The same model written as a
 multi-level Map literal:
 
-```aql
+```boru
 import "./decision.aql"
 def tree {kind:"tree" root:"check-age" nodes:[
   {id:"check-age" kind:"branch" branches:[
@@ -289,7 +289,7 @@ matching `then`/leaf result; a miss or a structural problem returns an
 error Map `{ok:false error:"…"}`. A genuine result has no `ok` field, so
 the way to detect a miss is to test whether `ok` is exactly `false`:
 
-```aql
+```boru
 import "./decision.aql"
 def table (Decision.make-table [
   (Decision.make-rule {field:"age" op:"gte" value:65} {category:"senior"})
@@ -306,7 +306,7 @@ print (if ((out2.ok) false eq) ["no rule matched"] [out2]) end   # => {category:
 `(out.ok) false eq` is true exactly when the evaluation failed. The
 `error` field then tells you why:
 
-```aql
+```boru
 import "./decision.aql"
 def table (Decision.make-table [
   (Decision.make-rule {field:"age" op:"gte" value:65} {category:"senior"})
@@ -328,7 +328,7 @@ missing value is `None` and `None` is not Comparable. Keep ordered
 fields present (see [Use compound conditions](#use-compound-conditions)),
 or trap the raise with `do … error …`:
 
-```aql
+```boru
 import "./decision.aql"
 def safe (do [(Decision.eval-cond {field:"score" op:"gte" value:50} {age:25})]
              error [var [[e] "field missing — treated as no match"]])
@@ -339,10 +339,10 @@ print (safe) end   # => field missing — treated as no match
 
 ## Use it from your own script
 
-Import the library by relative path — it pulls in no `aql:*`
+Import the library by relative path — it pulls in no `boru:*`
 dependencies, so there is nothing else to import:
 
-```aql
+```boru
 import "./decision.aql"
 
 def table (Decision.make-table [
@@ -386,15 +386,15 @@ from, and [AGENTS.md](../AGENTS.md) is the condensed calling guide.
 
 ## Run the tests
 
-Five suites ship with the module. Run them with `aql` from the repo root
+Five suites ship with the module. Run them with `boru` from the repo root
 (so `import "./decision.aql"` resolves):
 
 ```bash
-aql test/decision_unit_test.aql   # example-based unit tests — direct (aql:test)
-aql test/decision_unit_spec.aql   # example-based unit tests — declarative spec format
-aql test/decision_prop_test.aql   # property tests — direct Test.check-prop form
-aql test/decision_prop_spec.aql   # property tests — declarative spec format
-aql test/decision_smoke_test.aql  # end-to-end walk-through over every public word
+boru test/decision_unit_test.aql   # example-based unit tests — direct (boru:test)
+boru test/decision_unit_spec.aql   # example-based unit tests — declarative spec format
+boru test/decision_prop_test.aql   # property tests — direct Test.check-prop form
+boru test/decision_prop_spec.aql   # property tests — declarative spec format
+boru test/decision_smoke_test.aql  # end-to-end walk-through over every public word
 ```
 
 The file names follow a consistent convention: `_test.aql` is a direct
@@ -415,26 +415,26 @@ the imperative `Test.check-prop` driver directly, passing
 `runs`/`seed`/`max-shrinks` explicitly.
 
 Each assertion-bearing suite ends by asserting `Test.fail-count` is `0`,
-so a failure makes `aql` exit non-zero — which is exactly what the
+so a failure makes `boru` exit non-zero — which is exactly what the
 [CI workflow](../.github/workflows/test.yml) checks on every push and
 pull request. The smoke suite carries no assertions; it passes by
 running clean (exit `0` with no error).
 
 ## Run the suites under every execution mode
 
-AQL can run a program three ways:
+boru can run a program three ways:
 
-- **interpreter** — `aql script.aql`: the default tree-walking engine.
-- **check** — `aql check script.aql`: the static type-checker (no
+- **interpreter** — `boru script.aql`: the default tree-walking engine.
+- **check** — `boru check script.aql`: the static type-checker (no
   execution); it exits non-zero if it reports any error.
-- **bytecode** — `aql --force-compile script.aql`: compiles the program
+- **bytecode** — `boru --force-compile script.aql`: compiles the program
   to a flat strict-stack form and runs it on the kernel VM. It *aborts*
   with a refusal reason when it can't lower a program faithfully (rather
   than silently falling back to the interpreter, which plain `--compile`
   does) — so a clean run is proof the VM actually executed the program.
 
-`test/diverge.sh` is the gate, and it **tracks the latest `aql` from
-`main`** — AQL is on an iterative-improvement track, so the gate targets
+`test/diverge.sh` is the gate, and it **tracks the latest `boru` from
+`main`** — boru is on an iterative-improvement track, so the gate targets
 the newest build rather than pinning a fixed one. It runs every suite
 under all three modes:
 
@@ -452,19 +452,19 @@ bash test/diverge.sh
 Three invariants are **hard** (a violation fails the gate):
 
 1. the interpreter passes every suite (the supported path);
-2. the checker (`aql check`) reports zero errors on every suite;
+2. the checker (`boru check`) reports zero errors on every suite;
 3. every suite the compiler **accepts** produces output byte-identical to
    the interpreter — the two engines never diverge.
 
-The checker reached **zero false positives** on this library as of aql
+The checker reached **zero false positives** on this library as of boru
 `main` `0b010ae` (every suite, and `decision.aql` itself, now check 0
 errors — see the upstream
-[`CLIENT-VERIFICATION-MAIN-2026-06-24.md`](https://github.com/aql-lang/aql/blob/main/design/CLIENT-VERIFICATION-MAIN-2026-06-24.md)),
+[`CLIENT-VERIFICATION-MAIN-2026-06-24.md`](https://github.com/boru-lang/boru/blob/main/design/CLIENT-VERIFICATION-MAIN-2026-06-24.md)),
 so `check` is now a real gate rather than advisory status — a regression
 on a newer `main` is a signal worth failing on.
 
 The one thing reported as **current status** is *compile coverage*,
-because it moves as `aql` improves and is outside this repo's control:
+because it moves as `boru` improves and is outside this repo's control:
 which suites the compiler accepts (the test-framework code-body words
 `test-test` / `each`, and the `smoke` suite's dynamic-help
 `check diagnostics` artifact, are still being lowered upstream). The
@@ -473,12 +473,12 @@ they are divergence-checked automatically — no edit needed.
 
 Resolving the build (latest `main` by default): the gate uses
 `$BYTECODE_AQL` if you point it at a binary, otherwise it builds
-`$BYTECODE_AQL_REF` (default: current `main` HEAD), caching by sha in
-`~/.local/bin`. The project's pinned `AQL_REF` (`61856202`) predates the
+`$BYTECODE_BORU_REF` (default: current `main` HEAD), caching by sha in
+`~/.local/bin`. The project's pinned `BORU_REF` (`61856202`) predates the
 bytecode compiler and is **only** the interpreter baseline — the gate's
 build is independent of it. Because the proxy git relay is scoped, the
 source is fetched as an HTTPS tarball from codeload; a new sha needs `go`
 + network, after which it's cached. To pin a specific commit (e.g. for a
-reproducible CI run), pass `BYTECODE_AQL_REF=<sha>`. To wire the gate into
+reproducible CI run), pass `BYTECODE_BORU_REF=<sha>`. To wire the gate into
 CI, add a step that runs `bash test/diverge.sh` after the suites; note
 that editing `.github/workflows/` needs a token with `workflow` scope.

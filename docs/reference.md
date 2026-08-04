@@ -13,14 +13,14 @@ with the [Tutorial](tutorial.md).
 The module exports a single namespace, `Decision`, plus its record
 types and the `Comparable` surface. Import it with:
 
-```aql
+```boru
 import "./decision.aql"
 ```
 
 The path resolves **relative to the working directory the script is run
 from**, not the importing file — run scripts from the directory where
-`./decision.aql` is valid. The library imports no `aql:*` dependencies,
-so a consumer needs nothing else; it does require **aql ≥ `61856202`**
+`./decision.aql` is valid. The library imports no `boru:*` dependencies,
+so a consumer needs nothing else; it does require **boru ≥ `61856202`**
 (it uses `surface`/`exposes`, generics, `refine Record`, and `fnsig`).
 
 ---
@@ -123,7 +123,7 @@ require. It is exposed by the scalar builtins `Integer`, `Float`,
 `String`, `Boolean`, and `Atom`; a user type joins by exposing
 `Comparable` itself. It is a membership test, not a record:
 
-```aql
+```boru
 (5 is Decision.Comparable) print     # => true   (a scalar is Comparable)
 ({a:1} is Decision.Comparable) print # => false  (a map has no cmp contract)
 ```
@@ -146,7 +146,7 @@ Construct a single condition.
 | **Args**    | `field` (Atom — quote with `/q`), `op` (String), `value` (Any) |
 | **Returns** | `Cond` |
 
-```aql
+```boru
 (Decision.cond age/q "gte" 18) print
 # => {field: age, op: gte, value: 18}
 ```
@@ -161,7 +161,7 @@ Build an *every-child-must-hold* predicate.
 | **Args**    | `children` (List of condition/predicate Maps) |
 | **Returns** | `Pred` (`kind:"group" op:"all"`) |
 
-```aql
+```boru
 (Decision.all-of [{field:"age" op:"gte" value:18} {field:"score" op:"gt" value:50}]) print
 # => {kind: group, op: all, children: [{field: age, op: gte, value: 18}, {field: score, op: gt, value: 50}]}
 ```
@@ -186,7 +186,7 @@ Negate a single condition.
 | **Args**    | `child` (a single condition Map) |
 | **Returns** | `Pred` (`kind:"group" op:"not"`) |
 
-```aql
+```boru
 (Decision.not-of {field:"age" op:"lt" value:18}) print
 # => {kind: group, op: not, children: {field: age, op: lt, value: 18}}
 ```
@@ -201,7 +201,7 @@ Pair a `when` condition/predicate with a `then` result.
 | **Args**    | `when` (condition/predicate Map), `then` (a Map result) |
 | **Returns** | `Rule` |
 
-```aql
+```boru
 (Decision.make-rule {field:"age" op:"gte" value:18} {category:"adult"}) print
 # => {when: {field: age, op: gte, value: 18}, then: {category: adult}}
 ```
@@ -218,7 +218,7 @@ Assemble a list of rules into a table.
 | **Args**    | `rules` (List of `Rule` records / `{when:… then:…}` maps) |
 | **Returns** | `DTable` (hit policy defaults to `"first"`) |
 
-```aql
+```boru
 (Decision.make-table [{when:{field:"age" op:"lt" value:18} then:{category:"minor"}}]) print
 # => {kind: table, rules: [{then: {category: minor}, when: {field: age, op: lt, value: 18}}], hit-policy: first}
 ```
@@ -233,7 +233,7 @@ Copy a table with a new hit policy.
 | **Args**    | `policy` (String — one of the [hit policies](#hit-policies)), `table` (`DTable`) |
 | **Returns** | `DTable` (same rules, swapped `hit-policy`) |
 
-```aql
+```boru
 def t (Decision.make-table [{when:{field:"x" op:"gt" value:0} then:{s:"pos"}}])
 (Decision.with-policy "unique" t) print
 # => {kind: table, rules: [{then: {s: pos}, when: {field: x, op: gt, value: 0}}], hit-policy: unique}
@@ -249,7 +249,7 @@ Build an interior tree node.
 | **Args**    | `id` (Atom — quote with `/q`), `branches` (List of `{when:… next:…}`) |
 | **Returns** | `BranchNode` (`kind:"branch"`) |
 
-```aql
+```boru
 (Decision.make-branch root/q [{when:{field:"age" op:"gte" value:18} next:"adult"}]) print
 # => {id: root, kind: branch, branches: [{next: adult, when: {field: age, op: gte, value: 18}}]}
 ```
@@ -264,7 +264,7 @@ Build a terminal tree node.
 | **Args**    | `id` (Atom — quote with `/q`), `result` (Any) |
 | **Returns** | `LeafNode` (`kind:"leaf"`) |
 
-```aql
+```boru
 (Decision.make-leaf adult/q {category:"adult"}) print
 # => {id: adult, kind: leaf, result: {category: adult}}
 ```
@@ -279,7 +279,7 @@ Assemble a root id and node list into a tree.
 | **Args**    | `root` (Atom — quote with `/q`), `nodes` (List of branch/leaf nodes) |
 | **Returns** | `DTree` (`kind:"tree"`) |
 
-```aql
+```boru
 (Decision.make-tree root/q [{id:"root" kind:"leaf" result:"x"}]) print
 # => {kind: tree, root: root, nodes: [{id: root, kind: leaf, result: x}]}
 ```
@@ -300,7 +300,7 @@ The binary form is generic over `Comparable`: the ordering ops
 `eq`/`neq` are defined for everything. The 2-arg form handles the
 unary ops (`is_true`/`is_false`/`is_null`/`is_not_null`).
 
-```aql
+```boru
 (Decision.apply-op 18 "gte" 25) print   # => true   (lhs 25 gte rhs 18)
 (Decision.apply-op 25 "gte" 18) print   # => false  (lhs 18 gte rhs 25)
 (Decision.apply-op "a" "lt" "b") print  # => false  (Strings Comparable: lhs 'b' lt rhs 'a')
@@ -321,7 +321,7 @@ applies `cond.op` against `cond.value`.
 | **Args**    | `cond` (`Cond` Map), `input` (Map) |
 | **Returns** | `Boolean` |
 
-```aql
+```boru
 (Decision.eval-cond {field:"age" op:"gte" value:18} {age:25}) print  # => true
 (Decision.eval-cond {field:"age" op:"gte" value:18} {age:15}) print  # => false
 ```
@@ -342,7 +342,7 @@ condition).
 | **Args**    | `pred` (`Pred` Map, or a bare `Cond` Map), `input` (Map) |
 | **Returns** | `Boolean` |
 
-```aql
+```boru
 def p (Decision.all-of [{field:"age" op:"gte" value:18} {field:"score" op:"gt" value:50}])
 (Decision.eval-pred p {age:25 score:80}) print   # => true
 ```
@@ -357,7 +357,7 @@ Run a table under its hit policy.
 | **Args**    | `table` (`DTable`), `input` (Map) |
 | **Returns** | the matching rule's `then` result — or, for `"collect"`, a List — or an error Map |
 
-```aql
+```boru
 def tbl (Decision.make-table [
   {when:{field:"age" op:"lt"  value:18} then:{category:"minor"}}
   {when:{field:"age" op:"gte" value:18} then:{category:"adult"}}
@@ -379,7 +379,7 @@ Walk a tree's branches from its root to a leaf.
 | **Args**    | `tree` (`DTree`), `input` (Map) |
 | **Returns** | the reached leaf's `result` — or an error Map |
 
-```aql
+```boru
 def tree {kind:"tree" root:"root" nodes:[
   {id:"root" kind:"branch" branches:[
     {when:{field:"age" op:"lt"  value:18} next:"minor"}
@@ -405,7 +405,7 @@ Dispatch on `model.kind` — `"table"` runs `eval-table`, `"tree"` runs
 | **Args**    | `model` (a `DTable` or `DTree`), `input` (Map) |
 | **Returns** | as `eval-table` / `eval-tree` — or `{ok:false error:"unknown-model-kind"}` |
 
-```aql
+```boru
 def model {kind:"table" hit-policy:"first" rules:[
   {when:{field:"x" op:"gt" value:0} then:{sign:"positive"}}
 ]}
@@ -447,7 +447,7 @@ override with `with-policy`).
 | `"collect"` | a **List** of every matching rule's `then` (empty `[]` if none) |
 | `"priority"` | the matching rule with the highest `priority` field (default `0`) |
 
-```aql
+```boru
 def tags (Decision.with-policy "collect" (Decision.make-table [
   (Decision.make-rule {field:"age"   op:"gte" value:18} {tag:"adult"})
   (Decision.make-rule {field:"score" op:"gte" value:50} {tag:"passing"})

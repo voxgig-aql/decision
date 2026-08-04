@@ -1,6 +1,6 @@
 # Property-based tests for the decision module — DIRECT-CODE FORM.
 #
-# This file exercises aql:test's imperative `Test.check-prop` driver,
+# This file exercises boru:test's imperative `Test.check-prop` driver,
 # called directly in code with explicit run / seed / shrink counts —
 #
 #   Test.check-prop NAME  [GEN-BODY]  [PROP-BODY]  RUNS  SEED  MAX-SHRINKS
@@ -19,7 +19,7 @@
 #   aql test/decision_prop_test.aql
 
 
-import "aql:test" end
+import "boru:test" end
 import "./decision.aql" end
 
 

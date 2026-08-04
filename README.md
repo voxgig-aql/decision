@@ -1,13 +1,13 @@
 # decision
 
 A small, dependency-light **decision-logic** library implemented in
-[AQL](https://github.com/aql-lang/aql) — express business rules as
+[boru](https://github.com/boru-lang/boru) — express business rules as
 *data* (a condition, a compound predicate, a **decision table** with a
 hit policy, or a **decision tree** of branch/leaf nodes), then evaluate
-them against an input `Map`. No `aql:*` dependencies. The public surface
+them against an input `Map`. No `boru:*` dependencies. The public surface
 is the single `Decision` namespace.
 
-```aql
+```boru
 import "./decision.aql"
 
 def table (Decision.make-table [
@@ -20,7 +20,7 @@ def table (Decision.make-table [
 (Decision.decide table {age:30}) print end   # => {ok:false error:no-match}
 ```
 
-> **Calling convention.** AQL is forward: the verb first, arguments
+> **Calling convention.** boru is forward: the verb first, arguments
 > after, with the **receiver (the model/input) last** —
 > `Decision.decide model input`. Piping the input in also binds
 > (`input Decision.decide model`), but putting the receiver **first**
@@ -29,7 +29,7 @@ def table (Decision.make-table [
 > *non-match* returns `{ok:false error:"…"}` rather than throwing.
 
 > **Calling this library from an AI coding agent?** Read
-> **[AGENTS.md](AGENTS.md)** first — the exact AQL calling convention,
+> **[AGENTS.md](AGENTS.md)** first — the exact boru calling convention,
 > verified idioms, and common mistakes. (Claude Code auto-loads it via
 > `CLAUDE.md`; a portable skill lives in
 > [`.claude/skills/decision-aql`](.claude/skills/decision-aql/SKILL.md).)
@@ -85,7 +85,7 @@ results (`"no-match"`, `"multiple-matches"`, `"unknown-model-kind"`,
 ## For AI coding agents
 
 If an agent will call this library, point it at **[AGENTS.md](AGENTS.md)**
-— the exact AQL calling convention, verified idioms, and the common
+— the exact boru calling convention, verified idioms, and the common
 mistakes to avoid — alongside [`api.json`](api.json), the same API as a
 machine-readable manifest (call shapes, arg order, return types).
 
@@ -99,8 +99,8 @@ library, install the bundled skill either way:
 - **Install the plugin** — this repo is also a plugin marketplace:
 
   ```
-  /plugin marketplace add voxgig-aql/decision
-  /plugin install decision-aql@voxgig-aql
+  /plugin marketplace add voxgig-boru/decision
+  /plugin install decision-aql@voxgig-boru
   ```
 
 Working inside *this* repo, Claude Code picks the guidance up
@@ -118,9 +118,9 @@ test/decision_unit_spec.aql    example-based unit tests — declarative spec for
 test/decision_prop_test.aql    property-based tests — direct (Test.check-prop)
 test/decision_prop_spec.aql    property-based tests — declarative spec format
 test/decision_smoke_test.aql   end-to-end smoke run over every public word
-test/diverge.sh                multi-mode test gate (tracks latest aql; runs interpreter, check, bytecode)
+test/diverge.sh                multi-mode test gate (tracks latest boru; runs interpreter, check, bytecode)
 docs/                          Diátaxis documentation (above)
-dx-report.md                   developer-experience notes against aql @ 61856202, re-reviewed at 5aed3834
+dx-report.md                   developer-experience notes against boru @ 61856202, re-reviewed at 5aed3834
 ```
 
 Test files follow a consistent naming convention: `_test.aql` for direct
@@ -129,32 +129,32 @@ property).
 
 ## Running it
 
-Build the `aql` interpreter at the pinned commit `61856202`, then run any
+Build the `boru` interpreter at the pinned commit `61856202`, then run any
 script or test — see
 [How-to → Install and run](docs/how-to.md#install-and-run-aql):
 
 ```bash
-aql test/decision_unit_test.aql   # unit tests — direct
-aql test/decision_unit_spec.aql   # unit tests — declarative spec format
-aql test/decision_prop_test.aql   # property tests — direct
-aql test/decision_prop_spec.aql   # property tests — declarative spec format
-aql test/decision_smoke_test.aql  # end-to-end smoke run
+boru test/decision_unit_test.aql   # unit tests — direct
+boru test/decision_unit_spec.aql   # unit tests — declarative spec format
+boru test/decision_prop_test.aql   # property tests — direct
+boru test/decision_prop_spec.aql   # property tests — declarative spec format
+boru test/decision_smoke_test.aql  # end-to-end smoke run
 ```
 
 Each assertion-bearing suite ends by asserting `Test.fail-count` is `0`
 and printing `all green`; the smoke run passes if it completes without an
 error. A GitHub Actions workflow
-([`.github/workflows/test.yml`](.github/workflows/test.yml)) builds aql
-from the pinned commit (`AQL_REF`) and runs every suite on each push and
+([`.github/workflows/test.yml`](.github/workflows/test.yml)) builds boru
+from the pinned commit (`BORU_REF`) and runs every suite on each push and
 pull request.
 
-AQL can run a program three ways — the tree-walking interpreter, the
-static checker (`aql check`), and an experimental bytecode compiler.
-`bash test/diverge.sh` tracks the **latest `aql` from `main`** and runs
+boru can run a program three ways — the tree-walking interpreter, the
+static checker (`boru check`), and an experimental bytecode compiler.
+`bash test/diverge.sh` tracks the **latest `boru` from `main`** and runs
 every suite under all three modes. Its hard guarantees are that every
 suite interprets and checks (zero errors) clean, and that any suite the
 compiler accepts matches the interpreter (no divergence); compile coverage
-is reported as current status and grows as `aql` does. See
+is reported as current status and grows as `boru` does. See
 [How-to → Run the suites under every execution mode](docs/how-to.md#run-the-suites-under-every-execution-mode).
 
 ## License

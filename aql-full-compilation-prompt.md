@@ -1,27 +1,27 @@
-# Prompt: make the client test suites fully `--force-compile` on aql `main`
+# Prompt: make the client test suites fully `--force-compile` on boru `main`
 
-You are working in **`aql-lang/aql`**. The goal below is concrete and verifiable.
+You are working in **`boru-lang/boru`**. The goal below is concrete and verifiable.
 Everything here is grounded in the current `main` design docs and in a live
-verification of the `voxgig-aql/decision` library against `main @ 407fedad`.
+verification of the `voxgig-boru/decision` library against `main @ 407fedad`.
 
 ---
 
 ## Goal
 
 **Every test suite of the three client libraries (`decision`, `trie`,
-`bloom-filter`) must run under strict `aql --force-compile` and produce output
+`bloom-filter`) must run under strict `boru --force-compile` and produce output
 byte-identical to the interpreter.** "Full compilation": no suite falls back, no
 suite refuses.
 
-Today these suites already **interpret** and **`aql check`** clean (0 errors),
+Today these suites already **interpret** and **`boru check`** clean (0 errors),
 and `--compile` (silent fallback) matches the interpreter everywhere. The only
 gap is the **strict** bytecode path (`--force-compile`), which still *refuses* a
 small, enumerated set of constructs. Closing that gap is the whole task.
 
 Definition of done:
 
-1. For each client suite, `aql --force-compile test/<suite>.aql` exits 0 and its
-   stdout equals `aql test/<suite>.aql` (the differential invariant).
+1. For each client suite, `boru --force-compile test/<suite>.aql` exits 0 and its
+   stdout equals `boru test/<suite>.aql` (the differential invariant).
 2. The langspec compilation corpus (`test/go/langspec`) is green with its
    ratchets at or below their new floors, **deliberately re-baselined** where
    a refusal legitimately becomes a compile (see Workstream B).
@@ -117,7 +117,7 @@ after `MarkReady`, and runs each fn body **in check mode** against synthetic
 example args (`{a:1,b:2}`). The body's dispatch failures against that stand-in
 become error-severity diagnostics. `CompileCheck` refuses any program carrying an
 error diagnostic — so these synthetic failures gate the emit even though the
-suite's *real* `aql check` is 0 errors. (`decision_smoke_test` checks clean; only
+suite's *real* `boru check` is 0 errors. (`decision_smoke_test` checks clean; only
 the compile path's internal check trips.)
 
 Why it can't be hot-fixed (measured in `.6`, do not repeat these):
@@ -162,7 +162,7 @@ Do **not** ship any partial diagnostic filter on the help eval (`.6` approaches
 - **Ratchets move monotonically down and stay green.** `refusalCeiling` /
   `computeRefusalCeiling` (`test/go/langspec`) only decrease; no row regresses
   tier without a deliberate, reviewed re-baseline (Workstream B step 3).
-- **No client-library source changes.** The fix is entirely in aql; the client
+- **No client-library source changes.** The fix is entirely in boru; the client
   suites are the acceptance fixtures, unchanged.
 - Land per-item, commit per-item with the ratchet delta, full suite green
   (`make fmt && make vet && make lint && make test`).
@@ -173,7 +173,7 @@ Do **not** ship any partial diagnostic filter on the help eval (`.6` approaches
 
 ```bash
 # Build
-( cd cmd/go && GOFLAGS=-mod=mod go build -o /tmp/aql-bin ./aql )
+( cd cmd/go && GOFLAGS=-mod=mod go build -o /tmp/aql-bin ./boru )
 
 # A. Per client suite, from each client repo ROOT — the acceptance fixtures:
 for f in test/*.aql; do
@@ -184,11 +184,11 @@ done
 
 # decision's own multi-mode gate already encodes the differential invariant and
 # tracks main HEAD — use it as a ready-made check:
-#   voxgig-aql/decision: bash test/diverge.sh
+#   voxgig-boru/decision: bash test/diverge.sh
 #   (as each refusal clears, that suite flips from "compile n/a (refused)" to
 #    "compile ok (== interp)" automatically — its compilable subset is auto-detected)
 
-# B. aql's own gates (must stay green throughout):
+# B. boru's own gates (must stay green throughout):
 make fmt && make vet && make lint && make test
 go test ./test/go/langspec/...        # the compilation corpus + ratchets
 go test ./lang/go/test/...            # incl. TestCheckUncalledFnBodyTypoStillFlagged,

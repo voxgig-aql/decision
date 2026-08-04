@@ -1,10 +1,10 @@
 # Tutorial: your first decision table
 
-This is a hands-on lesson. By the end you will have built a small AQL
+This is a hands-on lesson. By the end you will have built a small boru
 script that classifies people by age with a **decision table**, grown it
 into a compound rule, collected every match, and finally walked a
 **decision tree**. You need no prior knowledge of decision logic — just a
-working `aql` binary (see
+working `boru` binary (see
 [How-to → Install and run](how-to.md#install-and-run-aql)) and this
 repository checked out.
 
@@ -13,7 +13,7 @@ repository checked out.
 
 Follow along by typing the script into a file as we grow it. We will
 build it up in pieces and run it after each step. The one rule to keep in
-mind: AQL is forward — the verb comes first, then its arguments, with the
+mind: boru is forward — the verb comes first, then its arguments, with the
 **receiver (the model/input) last**: `Decision.decide table input`. Get
 that order wrong (`Decision.decide input table`) and it misbinds
 *silently* — both are Maps, so you get a plausible-looking wrong result,
@@ -26,7 +26,7 @@ isn't swallowed.
 
 Create a file `classify.aql` next to `decision.aql` with this content:
 
-```aql
+```boru
 import "./decision.aql"
 
 def minor-rule (Decision.make-rule {field:"age" op:"lt" value:18} {category:"minor"})
@@ -40,7 +40,7 @@ and the `then` second — here, "if `age` is less than 18, the category is
 apply, and a `value` to compare against. Run it:
 
 ```console
-$ aql classify.aql
+$ boru classify.aql
 {"when": {"field": "age", "op": "lt", "value": 18}, "then": {"category": "minor"}}
 ```
 
@@ -56,7 +56,7 @@ One rule is a condition; a *list* of rules with a hit policy is a
 **decision table**. Replace the body of `classify.aql` with three rules
 wrapped in a table, then ask it to `decide`:
 
-```aql
+```boru
 import "./decision.aql"
 
 def rules [
@@ -78,7 +78,7 @@ tried top to bottom and the **first** match wins. So order matters — the
 model's `kind` (here, a table) and runs it against the input Map. Run it:
 
 ```console
-$ aql classify.aql
+$ boru classify.aql
 {"category": "minor"}
 {"category": "senior"}
 {"category": "adult"}
@@ -95,7 +95,7 @@ What if nothing matches? Evaluators never throw on a miss — they return an
 error Map. Trim the table to a single rule and feed it an input that
 slips past:
 
-```aql
+```boru
 import "./decision.aql"
 
 def strict (Decision.make-table [
@@ -105,7 +105,7 @@ print (Decision.decide strict {age:40}) end
 ```
 
 ```console
-$ aql classify.aql
+$ boru classify.aql
 {"error": "no-match", "ok": false}
 ```
 
@@ -125,7 +125,7 @@ groups several conditions so that **every** child must hold (there are
 `Decision.any-of` and `Decision.not-of` too). Build a rule that only fires
 for an adult with a high score:
 
-```aql
+```boru
 import "./decision.aql"
 
 def premium (Decision.make-rule
@@ -141,7 +141,7 @@ print (Decision.decide vip-table {age:25 score:50}) end
 ```
 
 ```console
-$ aql classify.aql
+$ boru classify.aql
 {"tier": "premium"}
 {"error": "no-match", "ok": false}
 ```
@@ -162,7 +162,7 @@ policy with `Decision.with-policy` and the table returns a **List** of
 every matching rule's `then` — handy for tagging, where several labels can
 apply at once:
 
-```aql
+```boru
 import "./decision.aql"
 
 def tags (Decision.with-policy "collect" (Decision.make-table [
@@ -174,7 +174,7 @@ print (Decision.decide tags {age:25 score:80}) end
 ```
 
 ```console
-$ aql classify.aql
+$ boru classify.aql
 [{"tag": "adult"}, {"tag": "passing"}]
 ```
 
@@ -193,7 +193,7 @@ testing a condition, and leaf nodes carry the final result. The node ids
 are Atoms — quote a bare name with `/q`. Build a tree that first splits on
 age, then asks adults whether they're a member:
 
-```aql
+```boru
 import "./decision.aql"
 
 def tree-nodes [
@@ -221,7 +221,7 @@ print (Decision.decide tree {age:40 member:false}) end
 until it reaches a leaf and returns that leaf's `result`. Run it:
 
 ```console
-$ aql classify.aql
+$ boru classify.aql
 too-young
 welcome-vip
 welcome-guest
@@ -241,7 +241,7 @@ debugging. `Decision.eval-cond` tests one condition against an input;
 `Decision.apply-op` is the raw comparison underneath it (`lhs op rhs`,
 with the right-hand side first — `apply-op rhs op lhs`):
 
-```aql
+```boru
 import "./decision.aql"
 
 print (Decision.eval-cond {field:"age" op:"gte" value:18} {age:25}) end
@@ -251,7 +251,7 @@ print (Decision.apply-op true "is_true") end
 ```
 
 ```console
-$ aql classify.aql
+$ boru classify.aql
 true
 false
 true

@@ -1,4 +1,4 @@
-# decision direct unit tests using aql:test's imperative API.
+# decision direct unit tests using boru:test's imperative API.
 #
 # The sibling file `test/decision_unit_spec.aql` covers the same kind of
 # example-based checks through the declarative spec surface
@@ -8,7 +8,7 @@
 #   aql test/decision_unit_test.aql
 
 
-import "aql:test" end
+import "boru:test" end
 import "./decision.aql" end
 
 
