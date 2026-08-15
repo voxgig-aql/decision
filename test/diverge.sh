@@ -116,7 +116,15 @@ checkclean=0    # how many suites checked with 0 errors (status)
 for suite in "${SUITES[@]}"; do
   name="${suite#test/}"; notes=()
 
-  int_out="$("$AQL" "$suite" 2>&1)"; int_rc=$?
+  # --no-compile, NOT a bare invocation: the default mode COMPILES when it can
+  # and falls back silently, so a bare `$AQL "$s"` here would compare bytecode
+  # against bytecode and this column would never see a divergence. That is not
+  # hypothetical — it is exactly how boru's function-value scope defect
+  # (design/FUNCTION-VALUE-SCOPE.0.md) stayed invisible to every gate in this
+  # ecosystem: the interpreter resolved a cross-module fn value's free words in
+  # the RUNNING module and the compiler in the DEFINING one, and no runner here
+  # could see it because no runner ever actually ran the interpreter.
+  int_out="$("$AQL" --no-compile "$suite" 2>&1)"; int_rc=$?
   if [ "$int_rc" -eq 0 ]; then notes+=("interp ok"); else notes+=("interp FAIL(rc=$int_rc)"); fail=1; fi
 
   chk_out="$("$AQL" check "$suite" 2>&1)"; chk_rc=$?
